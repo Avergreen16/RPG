@@ -1,0 +1,66 @@
+g++ -c src\*.cpp -std=c++17 -g -Wall -I include && g++ *.o -o bin\debug\main -L include\SDL2-w64\lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image && bin\debug\main
+
+g++ src_noise\*.cpp -g -Wall -I include -o bin\debug\noise -Linclude\FreeImage\Dist\x64 -lmingw32 -lgdi32 -lFreeImage && bin\debug\noise
+
+g++ src_noise\*.cpp -I include -o bin\debug\noise -Linclude\FreeImage\Dist\x64 -lmingw32 -lFreeImage
+
+bin\debug\noise
+
+cd OneDrive\desktop\"SDL game" && g++ src_noise\*.cpp -I include -O3 -o bin\debug\noise -Linclude\FreeImage\Dist\x64 -lmingw32 -lFreeImage && bin\debug\noise
+
+g++ src_noise\noise1.cpp -I include -O3 -o bin\debug\noise1 -Linclude\FreeImage\Dist\x64 -lmingw32 -lFreeImage && bin\debug\noise1
+
+seed of andromeda
+
+cd OneDrive\desktop\"SDL game" && g++ src_noise\triangle_raster\*.cpp -I include -O3 -o bin\debug\triangle_raster -Linclude\FreeImage\Dist\x64 -lmingw32 -lFreeImage && bin\debug\triangle_raster
+
+g++ -c src\*.cpp -std=c++14 -g -Wall -I include && g++ *.o -o bin\debug\main -L include\SDL2-w64\lib -L glew-2.2.0\lib\Release\x64 -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lglu32 -lopengl32 && bin\debug\main
+
+g++ -c src\*.cpp src\*.c -std=c++14 -g -Wall -I include && g++ *.o -o bin\debug\main -L include\SDL2-w64\lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image && bin\debug\main
+
+-lGL
+
+g++ -c src\*.cpp -std=c++17 -g -Wall -I include && g++ *.o -o bin\debug\main -L include\SDL2-w64\lib -L include\glew-2.1.0\lib\Release\x64 -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lopengl32 -lglew32 && bin\debug\main
+
+g++ -c src_noise\solarsystem.cpp && g++ solarsystem.o -o bin\debug\solarsystem && bin\debug\solarsystem
+
+g++ -c src\main.cpp -std=c++17 -g -Wall -I include -I include\SFML-2.5.1\include && g++ main.o -o bin\debug\main -L include\SFML-2.5.1\lib -lmingw32 -lsfml-main -lsfml-system -lsfml-graphics -lsfml-audio -lsfml-network -lsfml-window && bin\debug\main
+
+g++ -c src_noise\noise.cpp -std=c++17 -g -Wall -I include -I include\SFML-2.5.1\include && g++ noise.o -o bin\debug\noise -L include\SFML-2.5.1\lib -lmingw32 -lsfml-main -lsfml-system -lsfml-graphics -lsfml-audio -lsfml-network -lsfml-window && bin\debug\noise
+
+g++ -c src_noise\voronoi_generator.cpp -std=c++17 -g -Wall -I include -I include\SFML-2.5.1\include && g++ voronoi_generator.o -o bin\debug\voronoi_generator -L include\SFML-2.5.1\lib -lmingw32 -lsfml-main -lsfml-system -lsfml-graphics -lsfml-audio -lsfml-network -lsfml-window && bin\debug\voronoi_generator
+
+g++ -c src\universe.cpp -std=c++17 -g -Wall -I include -I include\SFML-2.5.1\include && g++ universe.o -o bin\debug\universe -L include\SFML-2.5.1\lib -lmingw32 -lsfml-main -lsfml-system -lsfml-graphics -lsfml-audio -lsfml-network -lsfml-window && bin\debug\universe
+
+g++ -c src\terraingen.cpp -std=c++17 -g -Wall -I include -I include\SFML-2.5.1\include && g++ terraingen.o -o bin\debug\terraingen -L include\SFML-2.5.1\lib -lmingw32 -lsfml-main -lsfml-system -lsfml-graphics -lsfml-audio -lsfml-network -lsfml-window && bin\debug\terraingen
+
+g++ -c src\surface.cpp -std=c++17 -g -Wall -Iinclude -Iinclude\SFML-2.5.1\include && g++ surface.o -o bin\debug\surface -L include\SFML-2.5.1\lib -lmingw32 -lsfml-main -lsfml-system -lsfml-graphics -lsfml-audio -lsfml-network -lsfml-window && bin\debug\surface
+
+g++ -c src\main2.cpp -std=c++20 -g -Wall -Iinclude && g++ main2.o glad.o -o bin\debug\main2 -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll -lws2_32 && bin\debug\main2
+
+g++ -c src\terraingen.cpp -std=c++20 -g -Wall -Iinclude && g++ terraingen.o -o bin\debug\terraingen -lmingw32 && bin\debug\terraingen
+
+g++ -c src\planets.cpp -std=c++20 -g -Wall -Iinclude && g++ planets.o glad.o -o bin\debug\planets -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll && bin\debug\planets
+
+g++ -c src\server.cpp -std=c++20 -g -Wall -Iinclude && g++ server.o -o bin\debug\server -lmingw32 -lws2_32
+
+g++ -c src\client.cpp -std=c++20 -g -Wall -Iinclude && g++ client.o -o bin\debug\client -lmingw32 -lws2_32
+
+g++ -c src\serverudp.cpp -std=c++20 -g -Wall -Iinclude && g++ serverudp.o -o bin\debug\serverudp -lmingw32 -lws2_32
+
+g++ -c src\clientudp.cpp -std=c++20 -g -Wall -Iinclude && g++ clientudp.o -o bin\debug\clientudp -lmingw32 -lws2_32
+
+g++ -c src\game_client.cpp -std=c++20 -g -Wall -Iinclude && g++ game_client.o glad.o -o bin\debug\game_client -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll -lws2_32
+
+g++ -c src\game_server.cpp -std=c++20 -g -Wall -Iinclude && g++ game_server.o -o bin\debug\game_server -lmingw32 -lws2_32
+
+g++ -c src\game_client.cpp include\glad\src\glad.c -std=c++20 -g -Wall -Iinclude && g++ game_client.o glad.o -o bin\debug\game_client -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll
+
+terra map seed: 0.7707326
+shafur map seed: 0.6770321
+-> make it so that maps don't loop in the north-south direction (add a polar barrier)
+-- this is to prevent errors in the day/night algorithm (it won't be continuous through the north/south boundary edge
+-> add footprints on sand
+ 0
+2 3
+ 1

@@ -1,0 +1,3 @@
+make a line between each point, get the midpoint, and then create a circle centered on the midpoint that has a diameter
+equal to the line between the points. Both points are on opposite sides of the circle's edge. If no points lie inside
+the circle, the line connecting the 2 points is part of the Delaunay triangulation.
