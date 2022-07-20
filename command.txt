@@ -54,8 +54,6 @@ g++ -c src\game_client.cpp -std=c++20 -g -Wall -Iinclude && g++ game_client.o gl
 
 g++ -c src\game_server.cpp -std=c++20 -g -Wall -Iinclude && g++ game_server.o -o bin\debug\game_server -lmingw32 -lws2_32
 
-g++ -c src\game_client.cpp include\glad\src\glad.c -std=c++20 -g -Wall -Iinclude && g++ game_client.o glad.o -o bin\debug\game_client -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll
-
 terra map seed: 0.7707326
 shafur map seed: 0.6770321
 -> make it so that maps don't loop in the north-south direction (add a polar barrier)
@@ -64,6 +62,9 @@ shafur map seed: 0.6770321
  0
 2 3
  1
+
+g++ -c src\game_client.cpp -std=c++20 -g -Wall -Iinclude
+g++ game_client.o glad.o -o bin\debug\game_client -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll
 
 asio test compile commands:
 

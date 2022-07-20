@@ -102,7 +102,8 @@ int type_pos = 0; // position in string of cursor
 int type_start = 0; // position in string of leftmost displayed char
 int type_len = 0; // length of string in pixels
 
-int chat_row = 0; // topmost row displayed of chat messages
+int total_chat_lines = 0;
+int chat_line = 0; // topmost row displayed of chat messages
 
 int get_chat_list_lines() {
     int lines = 0;
@@ -119,8 +120,11 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
                 key_down_array[key] = true;
                 if(key == GLFW_KEY_W || key == GLFW_KEY_D || key == GLFW_KEY_S || key == GLFW_KEY_A) last_direction_key_pressed = key;
             }
-            else if(key == GLFW_KEY_R) chat_list.clear();
-            else if(key == GLFW_KEY_N) {
+            else if(key == GLFW_KEY_R) {
+                chat_line = 0;
+                total_chat_lines = 0;
+                chat_list.clear();
+            } else if(key == GLFW_KEY_N) {
                 loaded_chunks.clear();
                 current_chunk = 0xffffffffu;
             } else if(key == GLFW_KEY_T) {
@@ -144,7 +148,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
                 type_pos = 0;
                 type_start = 0;
                 type_len = 0;
-                chat_row = 0;
+                chat_line = std::max(total_chat_lines - 12, 0);
                 char_callback_string = "";
             } else if(key == GLFW_KEY_ENTER) {
                 enter_pressed = true;
@@ -217,11 +221,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
         }
     } else if(current_activity == CHAT) {
         if(yoffset > 0) {
-            if(chat_row >= 4) chat_row -= 4;
-            else chat_row = 0;
+            if(chat_line >= 4) chat_line -= 4;
+            else chat_line = 0;
         } else {
-            if(chat_row <= get_chat_list_lines() - 16) chat_row += 4;
-            else chat_row = get_chat_list_lines() - 12;
+            if(chat_line <= get_chat_list_lines() - 16) chat_line += 4;
+            else chat_line = get_chat_list_lines() - 12;
         }
     }
 }
@@ -858,19 +862,34 @@ void process_input(std::string input, Entity &player, std::list<text_struct> &ch
                 text_struct message;
                 message.set_values("Invalid parameters. (*tpm)", 600, 2);
                 message.get_len();
-                chat_list.emplace_front(message);
+                chat_list.emplace_back(message);
+                total_chat_lines += message.lines;
+                if(chat_list.size() >= 25) {
+                    total_chat_lines -= chat_list.front().lines;
+                    chat_list.pop_front();
+                }
             } else {
                 player.position = {x_val + 0.5, y_val + 0.25};
                 text_struct message;
                 message.set_values("Teleported " + player.name.str + "\\c000 to coordinates: " + std::to_string(x_val) + " " + std::to_string(y_val), 600, 2);
                 message.get_len();
-                chat_list.emplace_front(message);
+                chat_list.emplace_back(message);
+                total_chat_lines += message.lines;
+                if(chat_list.size() >= 25) {
+                    total_chat_lines -= chat_list.front().lines;
+                    chat_list.pop_front();
+                }
             }
         } else {
             text_struct message;
             message.set_values("Invalid command.", 600, 2);
             message.get_len();
-            chat_list.emplace_front(message);
+            chat_list.emplace_back(message);
+            total_chat_lines += message.lines;
+            if(chat_list.size() >= 25) {
+                total_chat_lines -= chat_list.front().lines;
+                chat_list.pop_front();
+            }
         }
     } else {
         // chat
@@ -878,9 +897,13 @@ void process_input(std::string input, Entity &player, std::list<text_struct> &ch
             text_struct message;
             message.set_values(player.name.str + "\\c000: " + input, 600, 2);
             message.get_len();
-            chat_list.emplace_front(message);
+            total_chat_lines += message.lines;
+            chat_list.emplace_back(message);
         }
-        if(chat_list.size() >= 25) chat_list.pop_back();
+        if(chat_list.size() >= 25) {
+            total_chat_lines -= chat_list.front().lines;
+            chat_list.pop_front();
+        }
     }
 }
 
@@ -1030,7 +1053,7 @@ int main() {
             type_pos = 0;
             type_start = 0;
             type_len = 0;
-            chat_row = 0;
+            chat_line = std::max(total_chat_lines - 12, 0);
         }
             
         player.tick(delta_time);
@@ -1150,19 +1173,19 @@ int main() {
         render_text(text_shader_program, text_img, text_img_info, {width, height}, {float(-player.name.get_len() / 2 * text_scale), float(0.875 * scale)}, player.name.str, text_scale, 1000);
 
         int text_y_pos = height / 2 - 64;
-        int chat_row_counter = 0;
+        int chat_line_counter = 0;
         for(text_struct message : chat_list) {
-            if(chat_row_counter >= chat_row) {
-                int lines_displayed = chat_row_counter - chat_row;
+            if(chat_line_counter >= chat_line) {
+                int lines_displayed = chat_line_counter - chat_line;
                 if(lines_displayed < 12) {
                     int lines_passed = render_text(text_shader_program, text_img, text_img_info, {width, height}, {float(-width / 2 + 10), float(text_y_pos)}, message.str.substr(0, (12 - lines_displayed < message.lines) ? message.first_chars[12 - lines_displayed] : message.str.length()), 2, 600);
                     text_y_pos -= lines_passed * 26;
-                    chat_row_counter += lines_passed;
+                    chat_line_counter += lines_passed;
                 }
             } else {
-                chat_row_counter += message.lines;
-                if(chat_row_counter > chat_row) {
-                    int num = message.lines - (chat_row_counter - chat_row);
+                chat_line_counter += message.lines;
+                if(chat_line_counter > chat_line) {
+                    int num = message.lines - (chat_line_counter - chat_line);
                     int lines_passed = render_text(text_shader_program, text_img, text_img_info, {width, height}, {float(-width / 2 + 10), float(text_y_pos)}, message.str.substr(message.first_chars[num]), 2, 600);
                     text_y_pos -= lines_passed * 26;
                 }

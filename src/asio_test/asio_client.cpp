@@ -68,6 +68,9 @@ int main() {
         socket0.write_some(asio::buffer(request.data(), request.size()), error_code);
     }
 
+    // sleep program to wait for asio to collect all incoming data
+    std::this_thread::sleep_for(std::chrono::seconds(20));
+
     context.stop();
     ctx_thread.join();
 
