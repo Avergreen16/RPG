@@ -86,7 +86,7 @@ void PerlinNoiseFactory::set_parameters(double seed, double factor, int main_vec
 
     maxvalue = 0;
     for(int i = 0; i < octaves; i++) {
-        maxvalue += 1 * pow(persistance, -i);
+        maxvalue += pow(persistance, -i);
     }
 }
 

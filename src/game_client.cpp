@@ -61,6 +61,10 @@ SOCKET set_up_socket() {
 
 //
 
+const unsigned int chunk_load_x = 2;
+const unsigned int chunk_load_y = 2;
+const unsigned int total_loaded_chunks = (chunk_load_x * 2 + 1) * (chunk_load_y * 2 + 1);
+
 enum game_activity{PLAY, CHAT};
 
 game_activity current_activity = PLAY;
@@ -86,6 +90,12 @@ std::map<int, bool> key_down_array = {
     {GLFW_KEY_SPACE, false}
 };
 
+bool rect_collision(std::array<double, 4> a, std::array<double, 4> b) {
+    if(a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1])
+        return true;
+    return false;
+}
+
 bool enter_pressed = false;
 
 int width = 1000, height = 1000;
@@ -93,7 +103,7 @@ int width = 1000, height = 1000;
 int last_direction_key_pressed;
 
 unsigned int current_chunk = 0xffffffffu;
-std::array<unsigned int, 25> active_chunks;
+std::array<unsigned int, total_loaded_chunks> active_chunks;
 std::unordered_map<unsigned int, Chunk_data*> loaded_chunks;
 
 std::string char_callback_string = "";
@@ -907,17 +917,19 @@ void process_input(std::string input, Entity &player, std::list<text_struct> &ch
     }
 }
 
-void chunk_gen_thread(bool &quit_game, std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, std::array<unsigned int, 25> &active_chunks, std::array<int, 2> world_size_chunks, unsigned int &current_chunk, Worldgen &worldgen, Entity &player) {
+void chunk_gen_thread(bool &quit_game, std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, std::array<unsigned int, total_loaded_chunks> &active_chunks, std::array<int, 2> world_size_chunks, unsigned int &current_chunk, Worldgen &worldgen, Entity &player) {
     while(!quit_game) {
         std::vector<unsigned int> update_chunk_queue;
         if(check_if_moved_chunk(player.position)) {
+            std::array<unsigned int, total_loaded_chunks> new_active_chunks;
             std::array<int, 2> current_chunk_pos = {current_chunk % world_size_chunks[0], current_chunk / world_size_chunks[0]};
-            for(int x = -2; x <= 2; ++x) {
-                for(int y = -2; y <= 2; ++y) {
-                    unsigned int chunk_key = current_chunk + x + world_size_chunks[0] * y;
+            for(int x = 0; x <= chunk_load_x * 2; ++x) {
+                for(int y = 0; y <= chunk_load_y * 2; ++y) {
+                    unsigned int chunk_key = current_chunk + (x - chunk_load_x) + world_size_chunks[0] * (y - chunk_load_y);
                     if(insert_chunk(loaded_chunks, world_size_chunks, chunk_key, &worldgen)) {
                         update_chunk_queue.push_back(chunk_key);
                     }
+                    new_active_chunks[x + y * (chunk_load_x * 2 + 1)] = chunk_key;
                 }
             }
 
@@ -926,9 +938,7 @@ void chunk_gen_thread(bool &quit_game, std::unordered_map<unsigned int, Chunk_da
             }
             update_chunk_queue.clear();
 
-            for(int i = 0; i < 25; ++i) {
-                active_chunks[i] = current_chunk + offsets[i];
-            }
+            active_chunks = new_active_chunks;
         }
     }
 }
@@ -1096,55 +1106,63 @@ int main() {
 
         int reference_y = int(player.position[1] / 16) * 16 - 32;
 
-        glUseProgram(chunk_shader_program_depth);
-
-        glBindTexture(GL_TEXTURE_2D, floor_tileset);
-
-        glUniform2f(0, width, height);
-        glUniform2f(4, scale, scale);
-        glUniform2f(6, 8.0, 16.0);
-
-        for(int i = 0; i < 25; ++i) {
+        for(int i = 0; i < total_loaded_chunks; ++i) {
             unsigned int key = active_chunks[i];
             
             if(loaded_chunks.contains(key)) {
                 Chunk_data* chunk = loaded_chunks[key];
                 
-                glUniform2f(2, (chunk->corner[0] - camera_pos[0]) * scale, (chunk->corner[1] - camera_pos[1]) * scale);
-                glUniform1f(8, round((chunk->corner[1] - reference_y)) * 0.01 + 0.1);
+                double x_corner = (chunk->corner[0] - camera_pos[0]) * scale;
+                double y_corner = (chunk->corner[1] - camera_pos[1]) * scale;
 
-                for(int j = 0; j < 256; ++j) {
-                    glUniform1i(9 + j, chunk->object_tiles[j].texture);
-                    glUniform1f(265 + j, offset_values[chunk->object_tiles[j].id]);
+                if(rect_collision({x_corner, y_corner, 16.0 * scale, 16.0 * scale}, {-width * 0.5, -height * 0.5, double(width), double(height)})) {
+                    glBindTexture(GL_TEXTURE_2D, floor_tileset);
+
+                    glUseProgram(chunk_shader_program_depth);
+                    glUniform2f(0, width, height);
+                    glUniform2f(4, scale, scale);
+                    glUniform2f(6, 8.0, 16.0);
+                    glUniform2f(2, x_corner, y_corner);
+                    glUniform1f(8, round((chunk->corner[1] - reference_y)) * 0.01 + 0.1);
+
+                    for(int j = 0; j < 256; ++j) {
+                        glUniform1i(9 + j, chunk->object_tiles[j].texture);
+                        glUniform1f(265 + j, offset_values[chunk->object_tiles[j].id]);
+                    }
+
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 256);
+
+                    // objects
+                    glUseProgram(chunk_shader_program);
+                    glUniform2f(0, width, height);
+                    glUniform2f(4, scale, scale);
+                    glUniform2f(6, 8.0, 16.0);
+                    glUniform2f(2, x_corner, y_corner);
+
+                    for(int j = 0; j < 256; ++j) {
+                        int floor_tex = chunk->floor_tiles[j].texture;
+                        if(floor_tex >= 56) floor_tex += water_sprite_counter.value;
+                        glUniform1i(8 + j, floor_tex);
+                    }
+
+                    glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 256);
                 }
-
-                glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 256);
             }
         }
-
-        glUseProgram(chunk_shader_program);
-
-        glBindTexture(GL_TEXTURE_2D, floor_tileset);
-
-        glUniform2f(0, width, height);
-        glUniform2f(4, scale, scale);
-        glUniform2f(6, 8.0, 16.0);
         
-        for(int i = 0; i < 25; ++i) {
+        /*for(int i = 0; i < total_loaded_chunks; ++i) {
             unsigned int key = active_chunks[i];
             if(loaded_chunks.contains(key)) {
                 Chunk_data* chunk = loaded_chunks[key];
-                glUniform2f(2, (chunk->corner[0] - camera_pos[0]) * scale, (chunk->corner[1] - camera_pos[1]) * scale);
 
-                for(int j = 0; j < 256; ++j) {
-                    int floor_tex = chunk->floor_tiles[j].texture;
-                    if(floor_tex >= 56) floor_tex += water_sprite_counter.value;
-                    glUniform1i(8 + j, floor_tex);
+                double x_corner = (chunk->corner[0] - camera_pos[0]) * scale;
+                double y_corner = (chunk->corner[1] - camera_pos[1]) * scale;
+
+                if(rect_collision({x_corner, y_corner, 16.0 * scale, 16.0 * scale}, {-width * 0.5, -height * 0.5, double(width), double(height)})) {
+                    
                 }
-
-                glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 256);
             }
-        }
+        }*/
 
         player.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
         //player1.render(camera_pos, scale, shader_program, {width, height});

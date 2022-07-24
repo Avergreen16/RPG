@@ -70,3 +70,6 @@ asio test compile commands:
 
 g++ -c src\asio_test\asio_client.cpp -std=c++20 -I include -I include\asio-1.22.2\include
 g++ asio_client.o -o bin\debug\asio_client -lmingw32 -lws2_32
+
+g++ -c src\asio_test\asio_server.cpp -std=c++20 -I include -I include\asio-1.22.2\include
+g++ asio_server.o -o bin\debug\asio_server -lmingw32 -lws2_32 -lwsock32
