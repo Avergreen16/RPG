@@ -9,35 +9,32 @@
 using asio::ip::tcp;
 
 int main() {
-    try {
-        asio::io_context io_context;
+    asio::io_context io_context;
 
-        tcp::resolver resolver(io_context);
+    tcp::resolver resolver(io_context);
 
-        auto endpoint = resolver.resolve("127.0.0.1", "42254");
+    auto endpoint = resolver.resolve("127.0.0.1", "42254");
 
-        tcp::socket socket(io_context);
+    tcp::socket socket(io_context);
 
-        asio::connect(socket, endpoint);
+    asio::connect(socket, endpoint);
 
-        while(true) {
-            // listen for messages
-            std::array<char, 128> buffer;
+    while(true) {
+        // listen for messages
+        std::array<char, 128> buffer;
 
-            asio::error_code error_code;
+        asio::error_code error_code;
 
-            size_t length = socket.read_some(asio::buffer(buffer.data(), buffer.size()), error_code);
+        size_t length = socket.read_some(asio::buffer(buffer.data(), buffer.size()), error_code);
 
-            if(error_code == asio::error::eof) {
-                break;
-            } else if(error_code) {
-                throw error_code;
-            }
-
-            std::cout.write(buffer.data(), length);
+        if(error_code == asio::error::eof) {
+            break;
+        } else if(error_code) {
+            std::cout << "Connection closed, error: " << error_code.message() << "\n";
+            break;
         }
-    } catch(std::exception& e) {
-        std::cerr << e.what() << std::endl;
+
+        std::cout.write(buffer.data(), length);
     }
 
     return 0;
