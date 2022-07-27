@@ -15,11 +15,12 @@
 #include "worldgen.cpp"
 #include "pathfinding.cpp"
 #include "text.cpp"
+#include "asio_client.cpp"
 
 /*struct player_packet {
     std::array<double, 2> position;
     std::array<int, 2> active_texture;
-    bool quit_game;
+    bool game_running;
 };
 
 SOCKET set_up_socket() {
@@ -824,8 +825,8 @@ position_manager pos_manager;
 
 void socket_loop(SOCKET s) {
     time_t time_container = clock();
-    bool quit_game = false;
-    while(!quit_game) {
+    bool game_running = false;
+    while(game_running) {
         send(s, (char*)&send_packet, sizeof(player_packet), 0);
         recv(s, (char*)&recv_packet, sizeof(player_packet), 0);
         int elapsed_time = clock() - time_container;
@@ -833,8 +834,8 @@ void socket_loop(SOCKET s) {
             pos_manager.position_time_queue.push({recv_packet.position, elapsed_time});
             time_container = clock();
         }
-        if(send_packet.quit_game) {
-            quit_game = true;
+        if(send_packet.game_running) {
+            game_running = true;
         }
     }
     closesocket(s);
@@ -844,7 +845,8 @@ void socket_loop(SOCKET s) {
 
 };*/
 
-void process_input(std::string input, Entity &player, std::list<text_struct> &chat_list) {
+std::vector<std::string> connection_input_collector;
+void process_input(std::string input, Entity& player, std::list<text_struct>& chat_list, netwk::TCP_client& connection) {
     if(input[0] == '*') {
         // command
         if(strcmp(input.substr(1, 4).data(), "tpm ") == 0) {
@@ -904,21 +906,13 @@ void process_input(std::string input, Entity &player, std::list<text_struct> &ch
     } else {
         // chat
         if(input.size() != 0) {
-            text_struct message;
-            message.set_values(player.name.str + "\\c000: " + input, 600, 2);
-            message.get_len();
-            total_chat_lines += message.lines;
-            chat_list.emplace_back(message);
-        }
-        if(chat_list.size() >= 25) {
-            total_chat_lines -= chat_list.front().lines;
-            chat_list.pop_front();
+            connection.send(netwk::packet({1, sizeof(input)}, std::vector<char>(input.begin(), input.end())));
         }
     }
 }
 
-void chunk_gen_thread(bool &quit_game, std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, std::array<unsigned int, total_loaded_chunks> &active_chunks, std::array<int, 2> world_size_chunks, unsigned int &current_chunk, Worldgen &worldgen, Entity &player) {
-    while(!quit_game) {
+void chunk_gen_thread(bool &game_running, std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, std::array<unsigned int, total_loaded_chunks> &active_chunks, std::array<int, 2> world_size_chunks, unsigned int &current_chunk, Worldgen &worldgen, Entity &player) {
+    while(game_running) {
         std::vector<unsigned int> update_chunk_queue;
         if(check_if_moved_chunk(player.position)) {
             std::array<unsigned int, total_loaded_chunks> new_active_chunks;
@@ -943,8 +937,8 @@ void chunk_gen_thread(bool &quit_game, std::unordered_map<unsigned int, Chunk_da
     }
 }
 
-void str_thread(bool &quit_game, std::string &str) {
-    while(!quit_game) {
+void str_thread(bool &game_running, std::string &str) {
+    while(game_running) {
         std::string getline_string;
         getline(std::cin, getline_string);
         str = getline_string;
@@ -952,6 +946,7 @@ void str_thread(bool &quit_game, std::string &str) {
 }
 
 int main() {
+    netwk::TCP_client connection(0xa50e);
     clock_t time_storage = clock();
     clock_t time_storage_frames = clock();
 
@@ -1018,9 +1013,12 @@ int main() {
     //Entity player1;
     Enemy enemy0;
     Enemy enemy1;
+    
+    std::string player_name;
+    std::getline(std::cin, player_name);
 
     //player1.construct({13155 + 0.5, 8110 + 0.5}, player_spritesheet);
-    player.construct({23472 + 0.5, 10384 + 0.5}, player_spritesheet, "\\c80fAvergreen");
+    player.construct({23472 + 0.5, 10384 + 0.5}, player_spritesheet, player_name);
     enemy0.construct({23472 + 0.5, 10378 + 0.5}, bandit0_spritesheet);
     enemy1.construct({23478 + 0.5, 10384 + 0.5}, bandit1_spritesheet);
 
@@ -1031,14 +1029,44 @@ int main() {
     water_cycle_timer.construct(800);
     water_sprite_counter.construct(4);
 
-    bool quit_game = false;
+    bool game_running = true;
     //std::thread t0(socket_loop, client_socket);
-    std::thread chunk_thread(chunk_gen_thread, std::ref(quit_game), std::ref(loaded_chunks), std::ref(active_chunks), world_size_chunks, std::ref(current_chunk), std::ref(worldgen), std::ref(player));
+    std::thread chunk_thread(chunk_gen_thread, std::ref(game_running), std::ref(loaded_chunks), std::ref(active_chunks), world_size_chunks, std::ref(current_chunk), std::ref(worldgen), std::ref(player));
 
-    //std::thread string_thread(str_thread, std::ref(quit_game), std::ref(words));]
+    std::thread process_connection_input_thread(
+        [&game_running]() {
+            while(game_running) {
+                if(connection_input_collector.size() > 0) {
+                    std::string input = connection_input_collector.back();
+                    connection_input_collector.pop_back();
+                    if(input.size() != 0) {
+                        text_struct message;
+                        message.set_values(input, 600, 2);
+                        message.get_len();
+                        total_chat_lines += message.lines;
+                        chat_list.emplace_back(message);
+                    }
+                    if(chat_list.size() >= 25) {
+                        total_chat_lines -= chat_list.front().lines;
+                        chat_list.pop_front();
+                    }
+                    if(current_activity == PLAY) {
+                        chat_line = std::max(total_chat_lines - 12, 0);
+                    }
+                }
+            }
+        }
+    );
+
+    //std::thread string_thread(str_thread, std::ref(game_running), std::ref(words));]
     text_struct version = {"\\c44fThe Simulation \\c000pre-alpha \\cf440.0.\\x1", 2, 1000};
+    connection.start(connection_input_collector, game_running);
 
-    while(!quit_game) {
+    connection.send(
+        netwk::packet({0}, std::vector<char>(player_name.begin(), player_name.end()))
+    );
+
+    while(game_running) {
         glfwGetFramebufferSize(window, &width, &height);
         width = width + 1 * (width % 2 == 1);
         height = height + 1 * (height % 2 == 1);
@@ -1056,7 +1084,7 @@ int main() {
         time_storage = clock();
 
         if(enter_pressed) {
-            process_input(char_callback_string, player, chat_list);
+            process_input(char_callback_string, player, chat_list, connection);
             char_callback_string = "";
             current_activity = PLAY;
             enter_pressed = false;
@@ -1232,7 +1260,7 @@ int main() {
             std::cout << "\n";
         }
 
-        quit_game = glfwWindowShouldClose(window);
+        game_running = !glfwWindowShouldClose(window);
     }
 
     glDeleteBuffers(1, &VBO);
@@ -1241,7 +1269,7 @@ int main() {
     glfwDestroyWindow(window);
     glfwTerminate();
 
-    //send_packet.quit_game = true;
+    //send_packet.game_running = true;
     //t0.join();
     chunk_thread.join();
     //string_thread.join();

@@ -63,13 +63,10 @@ shafur map seed: 0.6770321
 2 3
  1
 
-g++ -c src\game_client.cpp -std=c++20 -g -Wall -Iinclude
-g++ game_client.o glad.o -o bin\debug\game_client -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll
+g++ -c src\game_client.cpp -std=c++20 -g -Wall -I include -I include\asio-1.22.2\include && g++ game_client.o glad.o -o bin\debug\game_client -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll -lws2_32
 
 asio test compile commands:
 
-g++ -c src\asio_test\asio_client.cpp -std=c++20 -I include -I include\asio-1.22.2\include
-g++ asio_client.o -o bin\debug\asio_client -lmingw32 -lws2_32
+g++ -c src\asio_test\asio_client.cpp -std=c++20 -I include -I include\asio-1.22.2\include && g++ asio_client.o -o bin\debug\asio_client -lmingw32 -lws2_32
 
-g++ -c src\asio_test\asio_server.cpp -std=c++20 -I include -I include\asio-1.22.2\include
-g++ asio_server.o -o bin\debug\asio_server -lmingw32 -lws2_32 -lwsock32
+g++ -c src\asio_test\asio_server.cpp -std=c++20 -I include -I include\asio-1.22.2\include && g++ asio_server.o -o bin\debug\asio_server -lmingw32 -lws2_32 -lwsock32
