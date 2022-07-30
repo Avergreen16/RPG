@@ -20,6 +20,12 @@ namespace netwk {
         std::vector<char> body;
     };
     
+    std::string make_string(char* input_ptr, size_t size_bytes, bool terminator_char = true) {
+        std::string return_string(input_ptr, size_bytes);
+        if(terminator_char) return_string += '\0';
+        return return_string;
+    }
+    
     struct TCP_client {
         asio::io_context io_context;
         tcp::resolver resolver;
@@ -58,7 +64,10 @@ namespace netwk {
                                 if(error_code) {
                                     std::cout << "Error: " << error_code.message() << "\n";
                                 } else {
-                                    input_collector.push_back(std::string(buffer_1->data()));
+                                    std::cout << "Recieved " << bytes_transferred << " bytes from the server.\n";
+                                    std::string message = make_string(buffer_1->data(), bytes_transferred);
+                                    std::cout << "Message recieved: " << message << "\n";
+                                    input_collector.push_back(message);
                                     receive_loop(input_collector, game_running);
                                 }
                             }
@@ -84,11 +93,12 @@ namespace netwk {
         memcpy(packet_buffer.data(), &input, sizeof(packet_header));
         memcpy(packet_buffer.data() + sizeof(packet_header), input.body.data(), input.body.size());
         socket.async_write_some(asio::buffer(packet_buffer.data(), packet_buffer.size()), 
-            [](const asio::error_code& error_code, size_t bytes) {
+            [vec = input.body](const asio::error_code& error_code, size_t bytes) mutable {
                 if(error_code) {
                     std::cout << "Failed to send message to the server.\n";
                 } else {
                     std::cout << "Sent " << bytes << " bytes of data to the server.\n";
+                    std::cout << "Sent message: " << make_string(vec.data(), vec.size()) << "\n";
                 }
             }
         );

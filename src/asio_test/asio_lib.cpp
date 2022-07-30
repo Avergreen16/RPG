@@ -67,6 +67,12 @@ namespace netwk {
         void broadcast(std::string message);
     };
 
+    std::string make_string(char* input_ptr, size_t size_bytes, bool terminator_char = true) {
+        std::string return_string(input_ptr, size_bytes);
+        if(terminator_char) return_string += '\0';
+        return return_string;
+    }
+
     TCP_connection::TCP_connection(asio::io_context& io_context, unsigned int client_id) : socket(io_context) {
         message += std::to_string(client_id) + "\n";
         this->client_id = client_id;
@@ -83,50 +89,56 @@ namespace netwk {
     }
 
     void TCP_connection::recieve_loop(TCP_server* parent_server) {
-        std::array<char, sizeof(packet_header)>* buffer = new std::array<char, sizeof(packet_header)>;
+        std::shared_ptr<std::array<char, sizeof(packet_header)>> buffer(new std::array<char, sizeof(packet_header)>);
         socket.async_read_some(asio::buffer(buffer->data(), buffer->size()),
             [this, buffer, parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
                 if(error_code == asio::error::eof) {
                     std::cout << "Client " + std::to_string(client_id) + " disconnected (no error).\n";
+                    parent_server->broadcast(this->player_name + " \\c000 quit the game.");
                     break_connection = true;
                 } else if(error_code) {
                     std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
+                    parent_server->broadcast(this->player_name + " \\c000quit the game.");
                     break_connection = true;
                 } else {
                     packet_header header;
                     memcpy(&header, buffer->data(), bytes_transferred);
 
                     if(header.type == 0) {
-                        std::vector<char>* buffer_1 = new std::vector<char>(header.size_bytes);
+                        std::shared_ptr<std::vector<char>> buffer_1(new std::vector<char>(header.size_bytes));
                         socket.async_read_some(asio::buffer(buffer_1->data(), buffer_1->size()), 
                             [this, buffer_1, parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
                                 if(error_code) {
                                     std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
+                                    parent_server->broadcast(this->player_name + " \\c000 quit the game.");
                                     break_connection = true;
                                 } else {
-                                    this->player_name = std::string(buffer_1->data());
-                                    delete buffer_1;
+                                    std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ".\n";
+                                    this->player_name = make_string(buffer_1->data(), bytes_transferred, false);
+                                    std::cout << "Recieved message: " << this->player_name << "\n";
                                     parent_server->broadcast(this->player_name + "\\c000 joined the game.");
                                     recieve_loop(parent_server);
                                 }
                             }
                         );
                     } else {
-                        std::vector<char>* buffer_1 = new std::vector<char>(header.size_bytes);
+                        std::shared_ptr<std::vector<char>> buffer_1(new std::vector<char>(header.size_bytes));
                         socket.async_read_some(asio::buffer(buffer_1->data(), buffer_1->size()), 
                             [this, buffer_1, parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
                                 if(error_code) {
                                     std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
+                                    parent_server->broadcast(this->player_name + " \\c000 quit the game.");
                                     break_connection = true;
                                 } else {
-                                    parent_server->broadcast(this->player_name + " \\c000: " + buffer_1->data());
-                                    delete buffer_1;
+                                    std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ".\n";
+                                    std::string message = make_string(buffer_1->data(), bytes_transferred);
+                                    std::cout << "Recieved message: " << message << "\n";
+                                    parent_server->broadcast(this->player_name + " \\c000: " + message);
                                     recieve_loop(parent_server);
                                 }
                             }
                         );
                     }
-                    delete buffer;
                 }
             }
         );
