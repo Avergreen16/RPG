@@ -64,7 +64,7 @@ namespace netwk {
 
         int run();
 
-        void broadcast(std::string message);
+        void broadcast(unsigned int id, std::vector<uint8_t> body);
     };
 
     std::string make_string(char* input_ptr, size_t size_bytes, bool terminator_char = true) {
@@ -94,50 +94,87 @@ namespace netwk {
             [this, buffer, parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
                 if(error_code == asio::error::eof) {
                     std::cout << "Client " + std::to_string(client_id) + " disconnected (no error).\n";
-                    parent_server->broadcast(this->player_name + " \\c000 quit the game.");
+                    std::string message = this->player_name + " \\c000quit the game.";
+                    std::vector<uint8_t> body(message.size());
+                    memcpy(body.data(), message.data(), message.size());
+                    parent_server->broadcast(0, body);
                     break_connection = true;
                 } else if(error_code) {
                     std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
-                    parent_server->broadcast(this->player_name + " \\c000quit the game.");
+                    std::string message = this->player_name + " \\c000quit the game.";
+                    std::vector<uint8_t> body(message.size());
+                    memcpy(body.data(), message.data(), message.size());
+                    parent_server->broadcast(0, body);
                     break_connection = true;
                 } else {
                     packet_header header;
                     memcpy(&header, buffer->data(), bytes_transferred);
 
-                    if(header.type == 0) {
-                        std::shared_ptr<std::vector<char>> buffer_1(new std::vector<char>(header.size_bytes));
-                        socket.async_read_some(asio::buffer(buffer_1->data(), buffer_1->size()), 
-                            [this, buffer_1, parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
-                                if(error_code) {
-                                    std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
-                                    parent_server->broadcast(this->player_name + " \\c000 quit the game.");
-                                    break_connection = true;
-                                } else {
-                                    std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ".\n";
-                                    this->player_name = make_string(buffer_1->data(), bytes_transferred, false);
-                                    std::cout << "Recieved message: " << this->player_name << "\n";
-                                    parent_server->broadcast(this->player_name + "\\c000 joined the game.");
-                                    recieve_loop(parent_server);
+                    switch(header.type) {
+                        case 0: { // player logs in
+                            std::shared_ptr<std::vector<char>> buffer_1(new std::vector<char>(header.size_bytes));
+                            socket.async_read_some(asio::buffer(buffer_1->data(), buffer_1->size()), 
+                                [this, buffer_1, parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
+                                    if(error_code) { // if there is an error, disconnect player and tell other clients
+                                        std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
+
+                                        std::string message = this->player_name + " \\c000quit the game.";
+                                        std::vector<uint8_t> body(message.size());
+                                        memcpy(body.data(), message.data(), message.size());
+                                        parent_server->broadcast(0, body);
+
+                                        break_connection = true;
+                                    } else {
+                                        std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ".\n";
+                                        this->player_name = make_string(buffer_1->data(), bytes_transferred, false);
+                                        std::cout << "Recieved message: " << this->player_name << "\n";
+
+                                        std::string message = this->player_name + " \\c000joined the game.";
+                                        std::vector<uint8_t> body(message.size());
+                                        memcpy(body.data(), message.data(), message.size());
+                                        parent_server->broadcast(0, body);
+
+                                        recieve_loop(parent_server);
+                                    }
                                 }
-                            }
-                        );
-                    } else {
-                        std::shared_ptr<std::vector<char>> buffer_1(new std::vector<char>(header.size_bytes));
-                        socket.async_read_some(asio::buffer(buffer_1->data(), buffer_1->size()), 
-                            [this, buffer_1, parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
-                                if(error_code) {
-                                    std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
-                                    parent_server->broadcast(this->player_name + " \\c000 quit the game.");
-                                    break_connection = true;
-                                } else {
-                                    std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ".\n";
-                                    std::string message = make_string(buffer_1->data(), bytes_transferred);
-                                    std::cout << "Recieved message: " << message << "\n";
-                                    parent_server->broadcast(this->player_name + " \\c000: " + message);
-                                    recieve_loop(parent_server);
+                            );
+                            break;
+                        }
+
+                        case 1: { // chat message
+                            std::shared_ptr<std::vector<char>> buffer_1(new std::vector<char>(header.size_bytes));
+                            socket.async_read_some(asio::buffer(buffer_1->data(), buffer_1->size()), 
+                                [this, buffer_1, parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
+                                    if(error_code) { // if there is an error, disconnect player and tell other clients
+                                        std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
+
+                                        std::string message = this->player_name + " \\c000quit the game.";
+                                        std::vector<uint8_t> body(message.size());
+                                        memcpy(body.data(), message.data(), message.size());
+                                        parent_server->broadcast(0, body);
+
+                                        break_connection = true;
+                                    } else { // if there isn't an error, send the chat message to every client with the player's name attached
+                                        std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ".\n";
+
+                                        std::string message = this->player_name + " \\c000: " + make_string(buffer_1->data(), bytes_transferred);
+                                        std::vector<uint8_t> body(message.size());
+                                        memcpy(body.data(), message.data(), message.size());
+                                        parent_server->broadcast(0, body);
+
+                                        recieve_loop(parent_server);
+                                    }
                                 }
-                            }
-                        );
+                            );
+                            break;
+                        }
+
+                        case 2: { // player position packets
+                            
+                        }
+
+                        default:
+                            std::cout << "Recieved a packet with an invalid header type from client " + std::to_string(this->client_id) + "\n";
                     }
                 }
             }
@@ -205,20 +242,18 @@ namespace netwk {
         return 0;
     }
 
-    void TCP_server::broadcast(std::string message) {
-        packet input = {{0}, std::vector<char>(message.begin(), message.end())};
-        input.header.size_bytes = input.body.size();
-        std::vector<std::byte> packet_buffer(sizeof(packet_header) + input.body.size());
-        memcpy(packet_buffer.data(), &input, sizeof(packet_header));
-        memcpy(packet_buffer.data() + sizeof(packet_header), input.body.data(), input.body.size());
+    void TCP_server::broadcast(unsigned int id, std::vector<uint8_t> body) {
+        packet_header header(id, body.size());
+        std::vector<std::byte> packet_buffer(sizeof(packet_header) + body.size());
+        memcpy(packet_buffer.data(), &header, sizeof(packet_header));
+        memcpy(packet_buffer.data() + sizeof(packet_header), body.data(), body.size());
         for(auto& [key, c_thread] : connection_map) {
             async_write(c_thread.connection->socket, asio::buffer(packet_buffer.data(), packet_buffer.size()), 
-                [key, message](const asio::error_code& error, size_t bytes) {
+                [key](const asio::error_code& error, size_t bytes) {
                     if(error) {
                         std::cout << "Failed to send message to client " + std::to_string(key) + ".\n";
                     } else {
                         std::cout << "Sent " << bytes << " bytes of data to client " + std::to_string(key) + ".\n";
-                        std::cout << "Message: " << message << "\n";
                     }
                 }
             );

@@ -62,9 +62,11 @@ SOCKET set_up_socket() {
 
 //
 
-const unsigned int chunk_load_x = 2;
-const unsigned int chunk_load_y = 2;
-const unsigned int total_loaded_chunks = (chunk_load_x * 2 + 1) * (chunk_load_y * 2 + 1);
+typedef unsigned int uint;
+
+const uint chunk_load_x = 2;
+const uint chunk_load_y = 2;
+const uint total_loaded_chunks = (chunk_load_x * 2 + 1) * (chunk_load_y * 2 + 1);
 
 enum game_activity{PLAY, CHAT};
 
@@ -97,15 +99,19 @@ bool rect_collision(std::array<double, 4> a, std::array<double, 4> b) {
     return false;
 }
 
+/*double lerp(double x1, double x2, double lerp_value) {
+    return (x2 - x1) * lerp_value + x1;
+}*/
+
 bool enter_pressed = false;
 
 int width = 1000, height = 1000;
 
 int last_direction_key_pressed;
 
-unsigned int current_chunk = 0xffffffffu;
-std::array<unsigned int, total_loaded_chunks> active_chunks;
-std::unordered_map<unsigned int, Chunk_data*> loaded_chunks;
+uint current_chunk = 0xffffffffu;
+std::array<uint, total_loaded_chunks> active_chunks;
+std::unordered_map<uint, Chunk_data*> loaded_chunks;
 
 std::string char_callback_string = "";
 std::list<text_struct> chat_list;
@@ -241,7 +247,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     }
 }
 
-void char_callback(GLFWwindow* window, unsigned int codepoint) {
+void char_callback(GLFWwindow* window, uint codepoint) {
     if(current_activity == CHAT) {
         if(standard_chars.contains(codepoint)) type_len += standard_chars[codepoint][1] * 2 + 2;
         char_callback_string.insert(char_callback_string.begin() + type_pos, codepoint);
@@ -276,7 +282,7 @@ bool check_point_inclusion(std::array<int, 4> intrect, std::array<double, 2> poi
 }
 
 bool check_if_moved_chunk(std::array<double, 2> player_pos) {
-    unsigned int pos = (unsigned int)(player_pos[0] / 16) + (unsigned int)(player_pos[1] / 16) * world_size_chunks[0];
+    uint pos = (uint)(player_pos[0] / 16) + (uint)(player_pos[1] / 16) * world_size_chunks[0];
     if(pos != current_chunk) {
         current_chunk = pos;
         return true;
@@ -361,8 +367,67 @@ struct Approach {
 
 enum states{IDLE, WALKING, RUNNING, SWIMMING};
 
+struct entity_queue_struct {
+    std::array<double, 2> position;
+    directions direction;
+    uint delta_time;
+};
+
 struct Entity {
-    unsigned int spritesheet;
+    uint id;
+    uint spritesheet;
+    text_struct username;
+
+    std::array<float, 2> visual_size = {2, 2};
+    std::array<float, 2> visual_offset = {-1, -0.125};
+    std::array<double, 2> position = {-0x100, -0x100};
+    std::array<int, 2> sprite_size = {32, 32};
+    std::array<int, 2> active_sprite = {0, 3};
+
+    Double_counter cycle_timer;
+    Int_counter sprite_counter;
+
+    states state = IDLE;
+    directions direction_facing = SOUTH;
+    states texture_version = WALKING;
+
+    std::queue<entity_queue_struct> movement_queue;
+    entity_queue_struct previous_packet = {{-0x100, -0x100}, SOUTH, -1};
+    time_t last_input_time;
+    uint interpolation_time = 0;
+
+    void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
+        draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 8}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
+    }
+
+    int insert_position(netwk::entity_movement_packet input) {
+        time_t time_container = clock();
+        movement_queue.emplace(entity_queue_struct{input.position, input.direction, uint(time_container - last_input_time)});
+        last_input_time = time_container;
+    }
+
+    void tick(double delta) {
+        if(movement_queue.size() != 0) {
+            if(previous_packet.delta_time == -1) previous_packet = movement_queue.front();
+
+            direction_facing = movement_queue.front().direction;
+            active_sprite[0] = direction_facing;
+            
+            interpolation_time += delta;
+            if(interpolation_time > movement_queue.front().delta_time) {
+                interpolation_time -= movement_queue.front().delta_time;
+                previous_packet = movement_queue.front();
+                movement_queue.pop();
+            }
+
+            double lerp_value = interpolation_time / movement_queue.front().delta_time;
+            position = {lerp(movement_queue.front().position[0], previous_packet.position[0], lerp_value), lerp(movement_queue.front().position[1], previous_packet.position[1], lerp_value)};
+        }
+    }
+};
+
+struct Player {
+    uint spritesheet;
 
     std::array<float, 2> visual_size = {2, 2};
     std::array<float, 2> visual_offset = {-1, -0.125};
@@ -376,10 +441,10 @@ struct Entity {
     Approach speed;
 
     states state = IDLE;
+    states texture_version = WALKING;
     directions direction_moving = SOUTH;
     directions direction_facing = SOUTH;
     bool keys_pressed = false;
-    states texture_version = WALKING;
 
     text_struct name;
 
@@ -387,7 +452,7 @@ struct Entity {
         return {int(position[0] / 16), int(position[1] / 16)};
     }
 
-    void construct(std::array<double, 2> position, unsigned int image, std::string name) {
+    void construct(std::array<double, 2> position, uint image, std::string name) {
         this->position = position;
         spritesheet = image;
         cycle_timer.construct(150);
@@ -396,7 +461,7 @@ struct Entity {
         this->name.set_values(name, 0x10000, 3);
     }
     
-    void render(int reference_y, std::array<double, 2> camera_pos, float scale, unsigned int shader, std::array<int, 2> window_size) {
+    void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
         draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 8}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
     }
 
@@ -515,7 +580,7 @@ struct Entity {
     }
 };
 
-std::vector<tile_ID> get_blocks_around(std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, std::array<double, 4> bounding_box) {
+std::vector<tile_ID> get_blocks_around(std::unordered_map<uint, Chunk_data*> &loaded_chunks, std::array<double, 4> bounding_box) {
     std::vector<tile_ID> return_vector;
 
     int lower_x = bounding_box[0];
@@ -527,7 +592,7 @@ std::vector<tile_ID> get_blocks_around(std::unordered_map<unsigned int, Chunk_da
         for(int x = lower_x; x <= upper_x; ++x) {
             int chunk_x = x / 16;
             int chunk_y = y / 16;
-            unsigned int chunk_key = chunk_x + chunk_y * world_size_chunks[0];
+            uint chunk_key = chunk_x + chunk_y * world_size_chunks[0];
             int pos_x = x % 16;
             int pos_y = y % 16;
             return_vector.push_back(get_tile(loaded_chunks, chunk_key, pos_x, pos_y));
@@ -556,7 +621,7 @@ std::array<std::array<int, 15>, 15> empty_9x9_array = {
 };
 
 struct Enemy {
-    unsigned int spritesheet;
+    uint spritesheet;
 
     std::array<float, 2> visual_size = {2, 2};
     std::array<float, 2> visual_offset = {-1, -0.125};
@@ -571,14 +636,14 @@ struct Enemy {
     directions direction_moving = SOUTH;
     directions direction_facing = SOUTH;
 
-    void construct(std::array<double, 2> position, unsigned int image) {
+    void construct(std::array<double, 2> position, uint image) {
         this->position = position;
         spritesheet = image;
         cycle_timer.construct(150);
         sprite_counter.construct(4);
     }
     
-    void render(int reference_y, std::array<double, 2> camera_pos, float scale, unsigned int shader, std::array<int, 2> window_size) {
+    void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
         draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 4}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
     }
 
@@ -642,7 +707,7 @@ struct Enemy {
         }
     }
 
-    void pathfind(Entity target) {
+    void pathfind(Player target) {
         directions dir = Astar_pathfinding({7, 7}, {int(target.position[0] - position[0]) + 7, int(target.position[1] - position[1]) + 7}, empty_9x9_array);
         if(dir != -1) {
             state = WALKING;
@@ -674,7 +739,7 @@ struct Enemy {
     }
 };
 
-void set_player_state(std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, Entity* player) {
+void set_player_state(std::unordered_map<uint, Chunk_data*> &loaded_chunks, Player* player) {
     std::vector<tile_ID> tiles_stepped_on = get_blocks_around(loaded_chunks, {player->walk_box[0] + player->position[0], player->walk_box[1] + player->position[1], player->walk_box[2], player->walk_box[3]});
     if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) {
         player->state = SWIMMING;
@@ -685,7 +750,7 @@ void set_player_state(std::unordered_map<unsigned int, Chunk_data*> &loaded_chun
     }
 }
 
-void set_player_enums(std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, Entity* player) {
+void set_player_enums(std::unordered_map<uint, Chunk_data*> &loaded_chunks, Player* player) {
     bool check_last_key_pressed = true;
     if(key_down_array[GLFW_KEY_W]) {
         if(key_down_array[GLFW_KEY_D]) {
@@ -846,7 +911,7 @@ void socket_loop(SOCKET s) {
 };*/
 
 std::vector<std::string> connection_input_collector;
-void process_input(std::string input, Entity& player, std::list<text_struct>& chat_list, netwk::TCP_client& connection) {
+void process_input(std::string input, Player& player, std::list<text_struct>& chat_list, netwk::TCP_client& connection) {
     if(input[0] == '*') {
         // command
         if(strcmp(input.substr(1, 4).data(), "tpm ") == 0) {
@@ -906,20 +971,22 @@ void process_input(std::string input, Entity& player, std::list<text_struct>& ch
     } else {
         // chat
         if(input.size() != 0) {
-            connection.send(netwk::packet({1, sizeof(input)}, std::vector<char>(input.begin(), input.end())));
+            std::vector<uint8_t> body(input.size());
+            memcpy(body.data(), input.data(), input.size());
+            connection.send(1, body);
         }
     }
 }
 
-void chunk_gen_thread(bool &game_running, std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, std::array<unsigned int, total_loaded_chunks> &active_chunks, std::array<int, 2> world_size_chunks, unsigned int &current_chunk, Worldgen &worldgen, Entity &player) {
+void chunk_gen_thread(bool &game_running, std::unordered_map<uint, Chunk_data*> &loaded_chunks, std::array<uint, total_loaded_chunks> &active_chunks, std::array<int, 2> world_size_chunks, uint &current_chunk, Worldgen &worldgen, Player &player) {
     while(game_running) {
-        std::vector<unsigned int> update_chunk_queue;
+        std::vector<uint> update_chunk_queue;
         if(check_if_moved_chunk(player.position)) {
-            std::array<unsigned int, total_loaded_chunks> new_active_chunks;
+            std::array<uint, total_loaded_chunks> new_active_chunks;
             std::array<int, 2> current_chunk_pos = {current_chunk % world_size_chunks[0], current_chunk / world_size_chunks[0]};
             for(int x = 0; x <= chunk_load_x * 2; ++x) {
                 for(int y = 0; y <= chunk_load_y * 2; ++y) {
-                    unsigned int chunk_key = current_chunk + (x - chunk_load_x) + world_size_chunks[0] * (y - chunk_load_y);
+                    uint chunk_key = current_chunk + (x - chunk_load_x) + world_size_chunks[0] * (y - chunk_load_y);
                     if(insert_chunk(loaded_chunks, world_size_chunks, chunk_key, &worldgen)) {
                         update_chunk_queue.push_back(chunk_key);
                     }
@@ -927,7 +994,7 @@ void chunk_gen_thread(bool &game_running, std::unordered_map<unsigned int, Chunk
                 }
             }
 
-            for(unsigned int chunk_key : update_chunk_queue) {
+            for(uint chunk_key : update_chunk_queue) {
                 update_chunk_water(loaded_chunks, world_size_chunks, chunk_key);
             }
             update_chunk_queue.clear();
@@ -971,13 +1038,13 @@ int main() {
 
     glfwSwapInterval(0);
 
-    unsigned int square_shader_program = create_shader(vertex_shader, fragment_shader);
-    unsigned int text_shader_program = create_shader(vertex_shader_text, fragment_shader_text);
-    unsigned int chunk_shader_program = create_shader(vertex_shader_chunk, fragment_shader_chunk);
-    unsigned int chunk_shader_program_depth = create_shader(vertex_shader_chunk_depth, fragment_shader_chunk);
-    unsigned int solid_shader_program = create_shader(vertex_shader_color, fragment_shader_color);
+    uint square_shader_program = create_shader(vertex_shader, fragment_shader);
+    uint text_shader_program = create_shader(vertex_shader_text, fragment_shader_text);
+    uint chunk_shader_program = create_shader(vertex_shader_chunk, fragment_shader_chunk);
+    uint chunk_shader_program_depth = create_shader(vertex_shader_chunk_depth, fragment_shader_chunk);
+    uint solid_shader_program = create_shader(vertex_shader_color, fragment_shader_color);
 
-    unsigned int VBO, VAO;
+    uint VBO, VAO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     
@@ -998,19 +1065,19 @@ int main() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
 
     std::array<int, 3> floor_tileset_info, player_spritesheet_info, bandit0_spritesheet_info, bandit1_spritesheet_info, text_img_info;
-    unsigned int floor_tileset = generate_texture("res\\tiles\\floor_tileset.png", floor_tileset_info);
-    unsigned int player_spritesheet = generate_texture("res\\entities\\Player\\avergreen_spritesheet.png", player_spritesheet_info);
-    unsigned int bandit0_spritesheet = generate_texture("res\\entities\\Bandit\\bandit0_spritesheet.png", bandit0_spritesheet_info);
-    unsigned int bandit1_spritesheet = generate_texture("res\\entities\\Bandit\\bandit1_spritesheet.png", bandit1_spritesheet_info);
-    unsigned int text_img = generate_texture("res\\gui\\textsource.png", text_img_info);
+    uint floor_tileset = generate_texture("res\\tiles\\floor_tileset.png", floor_tileset_info);
+    uint player_spritesheet = generate_texture("res\\entities\\Player\\avergreen_spritesheet.png", player_spritesheet_info);
+    uint bandit0_spritesheet = generate_texture("res\\entities\\Bandit\\bandit0_spritesheet.png", bandit0_spritesheet_info);
+    uint bandit1_spritesheet = generate_texture("res\\entities\\Bandit\\bandit1_spritesheet.png", bandit1_spritesheet_info);
+    uint text_img = generate_texture("res\\gui\\textsource.png", text_img_info);
 
     int frames = 0;
 
     Worldgen worldgen;
     worldgen.construct_3(0.7707326, 6, 3, 7, 1.5, 4, 4, 3, 1.5, 4, 4, 4, 1.3);
 
-    Entity player;
-    //Entity player1;
+    Player player;
+    //Player player1;
     Enemy enemy0;
     Enemy enemy1;
     
@@ -1062,9 +1129,11 @@ int main() {
     text_struct version = {"\\c44fThe Simulation \\c000pre-alpha \\cf440.0.\\x1", 2, 1000};
     connection.start(connection_input_collector, game_running);
 
-    connection.send(
-        netwk::packet({0}, std::vector<char>(player_name.begin(), player_name.end()))
-    );
+    std::vector<uint8_t> msg_body(player_name.size());
+    memcpy(msg_body.data(), player_name.data(), player_name.size());
+    connection.send(0, msg_body);
+
+    std::unordered_map<int, Entity> Player_map;
 
     while(game_running) {
         glfwGetFramebufferSize(window, &width, &height);
@@ -1095,6 +1164,15 @@ int main() {
         }
             
         player.tick(delta_time);
+
+        for(auto& [key, entity] : Player_map) {
+            entity.tick(delta_time);
+        }
+        
+        netwk::entity_movement_packet packet{player.position, player.direction_facing};
+        std::vector<uint8_t> msg_body(sizeof(packet));
+        memcpy(msg_body.data(), &packet, sizeof(packet));
+        connection.send({2}, msg_body);
 
         //player1.position = pos_manager.interpolate(delta_time);
         //player1.active_sprite = recv_packet.active_texture;
@@ -1135,7 +1213,7 @@ int main() {
         int reference_y = int(player.position[1] / 16) * 16 - 32;
 
         for(int i = 0; i < total_loaded_chunks; ++i) {
-            unsigned int key = active_chunks[i];
+            uint key = active_chunks[i];
             
             if(loaded_chunks.contains(key)) {
                 Chunk_data* chunk = loaded_chunks[key];
@@ -1179,7 +1257,7 @@ int main() {
         }
         
         /*for(int i = 0; i < total_loaded_chunks; ++i) {
-            unsigned int key = active_chunks[i];
+            uint key = active_chunks[i];
             if(loaded_chunks.contains(key)) {
                 Chunk_data* chunk = loaded_chunks[key];
 
@@ -1193,9 +1271,12 @@ int main() {
         }*/
 
         player.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
-        //player1.render(camera_pos, scale, shader_program, {width, height});
         enemy0.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
         enemy1.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
+
+        for(auto& [key, entity] : Player_map) {
+            entity.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
+        }
 
         std::string hex_coords = to_hex_string(player.position[0]) + " " + to_hex_string(player.position[1]);
         std::string dec_coords = std::to_string(int(player.position[0])) + " " + std::to_string(int(player.position[1]));
