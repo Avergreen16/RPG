@@ -16,6 +16,7 @@
 #include "pathfinding.cpp"
 #include "text.cpp"
 #include "asio_client.cpp"
+#include "entities.cpp"
 
 /*struct player_packet {
     std::array<double, 2> position;
@@ -61,8 +62,6 @@ SOCKET set_up_socket() {
 }*/
 
 //
-
-typedef unsigned int uint;
 
 const uint chunk_load_x = 2;
 const uint chunk_load_y = 2;
@@ -292,50 +291,6 @@ bool check_if_moved_chunk(std::array<double, 2> player_pos) {
 
 //entities
 
-struct Double_counter {
-    double value = 0;
-    double limit;
-
-    void construct(double plimit) {
-        limit = plimit;
-    };
-
-    bool increment(double change) {
-        value += change;
-        if(value >= limit) {
-            value = 0;
-            return true;
-        }
-        return false;
-    }
-
-    void reset() {
-        value = 0;
-    }
-};
-
-struct Int_counter {
-    int value = 0;
-    int limit;
-
-    void construct(int plimit) {
-        limit = plimit;
-    };
-
-    bool increment() {
-        value++;
-        if(value >= limit) {
-            value = 0;
-            return true;
-        }
-        return false;
-    }
-
-    void reset() {
-        value = 0;
-    }
-};
-
 struct Approach {
     double value = 0.0;
     double target;
@@ -361,67 +316,6 @@ struct Approach {
                 value -= change;
                 if(value < target) value = target;
             }
-        }
-    }
-};
-
-enum states{IDLE, WALKING, RUNNING, SWIMMING};
-
-struct entity_queue_struct {
-    std::array<double, 2> position;
-    directions direction;
-    uint delta_time;
-};
-
-struct Entity {
-    uint id;
-    uint spritesheet;
-    text_struct username;
-
-    std::array<float, 2> visual_size = {2, 2};
-    std::array<float, 2> visual_offset = {-1, -0.125};
-    std::array<double, 2> position = {-0x100, -0x100};
-    std::array<int, 2> sprite_size = {32, 32};
-    std::array<int, 2> active_sprite = {0, 3};
-
-    Double_counter cycle_timer;
-    Int_counter sprite_counter;
-
-    states state = IDLE;
-    directions direction_facing = SOUTH;
-    states texture_version = WALKING;
-
-    std::queue<entity_queue_struct> movement_queue;
-    entity_queue_struct previous_packet = {{-0x100, -0x100}, SOUTH, -1};
-    time_t last_input_time;
-    uint interpolation_time = 0;
-
-    void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
-        draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 8}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
-    }
-
-    int insert_position(netwk::entity_movement_packet input) {
-        time_t time_container = clock();
-        movement_queue.emplace(entity_queue_struct{input.position, input.direction, uint(time_container - last_input_time)});
-        last_input_time = time_container;
-    }
-
-    void tick(double delta) {
-        if(movement_queue.size() != 0) {
-            if(previous_packet.delta_time == -1) previous_packet = movement_queue.front();
-
-            direction_facing = movement_queue.front().direction;
-            active_sprite[0] = direction_facing;
-            
-            interpolation_time += delta;
-            if(interpolation_time > movement_queue.front().delta_time) {
-                interpolation_time -= movement_queue.front().delta_time;
-                previous_packet = movement_queue.front();
-                movement_queue.pop();
-            }
-
-            double lerp_value = interpolation_time / movement_queue.front().delta_time;
-            position = {lerp(movement_queue.front().position[0], previous_packet.position[0], lerp_value), lerp(movement_queue.front().position[1], previous_packet.position[1], lerp_value)};
         }
     }
 };
@@ -458,7 +352,7 @@ struct Player {
         cycle_timer.construct(150);
         sprite_counter.construct(4);
         speed.target = 0.0;
-        this->name.set_values(name, 0x10000, 3);
+        this->name.set_values(name, 0x10000, 1);
     }
     
     void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
@@ -973,6 +867,7 @@ void process_input(std::string input, Player& player, std::list<text_struct>& ch
         if(input.size() != 0) {
             std::vector<uint8_t> body(input.size());
             memcpy(body.data(), input.data(), input.size());
+
             connection.send(1, body);
         }
     }
@@ -1064,12 +959,8 @@ int main() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
 
-    std::array<int, 3> floor_tileset_info, player_spritesheet_info, bandit0_spritesheet_info, bandit1_spritesheet_info, text_img_info;
+    std::array<int, 3> floor_tileset_info, text_img_info;
     uint floor_tileset = generate_texture("res\\tiles\\floor_tileset.png", floor_tileset_info);
-    uint player_spritesheet = generate_texture("res\\entities\\Player\\avergreen_spritesheet.png", player_spritesheet_info);
-    uint bandit0_spritesheet = generate_texture("res\\entities\\Bandit\\bandit0_spritesheet.png", bandit0_spritesheet_info);
-    uint bandit1_spritesheet = generate_texture("res\\entities\\Bandit\\bandit1_spritesheet.png", bandit1_spritesheet_info);
-    uint text_img = generate_texture("res\\gui\\textsource.png", text_img_info);
 
     int frames = 0;
 
@@ -1098,7 +989,11 @@ int main() {
 
     bool game_running = true;
     //std::thread t0(socket_loop, client_socket);
-    std::thread chunk_thread(chunk_gen_thread, std::ref(game_running), std::ref(loaded_chunks), std::ref(active_chunks), world_size_chunks, std::ref(current_chunk), std::ref(worldgen), std::ref(player));
+    std::thread chunk_thread(
+        [&game_running, &worldgen, &player]() {
+            chunk_gen_thread(game_running, loaded_chunks, active_chunks, world_size_chunks, current_chunk, worldgen, player);
+        }
+    );
 
     std::thread process_connection_input_thread(
         [&game_running]() {
@@ -1126,14 +1021,14 @@ int main() {
     );
 
     //std::thread string_thread(str_thread, std::ref(game_running), std::ref(words));]
+    std::unordered_map<uint32_t, Entity> player_map;
+
     text_struct version = {"\\c44fThe Simulation \\c000pre-alpha \\cf440.0.\\x1", 2, 1000};
-    connection.start(connection_input_collector, game_running);
+    connection.start(connection_input_collector, player_map, game_running);
 
     std::vector<uint8_t> msg_body(player_name.size());
     memcpy(msg_body.data(), player_name.data(), player_name.size());
     connection.send(0, msg_body);
-
-    std::unordered_map<int, Entity> Player_map;
 
     while(game_running) {
         glfwGetFramebufferSize(window, &width, &height);
@@ -1165,14 +1060,17 @@ int main() {
             
         player.tick(delta_time);
 
-        for(auto& [key, entity] : Player_map) {
+        for(auto& [key, entity] : player_map) {
             entity.tick(delta_time);
         }
         
-        netwk::entity_movement_packet packet{player.position, player.direction_facing};
-        std::vector<uint8_t> msg_body(sizeof(packet));
-        memcpy(msg_body.data(), &packet, sizeof(packet));
-        connection.send({2}, msg_body);
+        std::array<char, 64> player_name_array;
+        memcpy(player_name_array.data(), player_name.data(), player_name.size() + 1);
+
+        /*netwk::entity_movement_packet_toserv packet{player.position, player.direction_facing};
+        std::vector<uint8_t> msg_body(sizeof(netwk::entity_movement_packet_toserv));
+        memcpy(msg_body.data(), &packet, sizeof(netwk::entity_movement_packet_toserv));
+        connection.send(2, msg_body);*/
 
         //player1.position = pos_manager.interpolate(delta_time);
         //player1.active_sprite = recv_packet.active_texture;
@@ -1274,7 +1172,7 @@ int main() {
         enemy0.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
         enemy1.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
 
-        for(auto& [key, entity] : Player_map) {
+        for(auto& [key, entity] : player_map) {
             entity.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
         }
 
