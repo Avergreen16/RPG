@@ -8,8 +8,7 @@
 #include "global.cpp"
 #include "render.cpp"
 
-std::array<int, 3> text_img_info;
-uint text_img = generate_texture("res\\gui\\textsource.png", text_img_info);
+uint text_img;
 
 std::unordered_map<char, std::array<int, 2>> standard_chars = {
     {'A', {0, 6}},

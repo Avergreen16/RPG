@@ -494,7 +494,6 @@ Chunk_data* generate_chunk(Worldgen* worldgen, std::array<int, 2> world_size_chu
 bool insert_chunk(std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, std::array<int, 2> world_size_chunks, unsigned int chunk_key, Worldgen* worldgen) {
     if(!loaded_chunks.contains(chunk_key)) {
         std::array<int, 2> corner = {int(chunk_key % world_size_chunks[0] * 16), int(chunk_key / world_size_chunks[0]) * 16};
-        printf("%i %i\n", corner[0], corner[1]);
         loaded_chunks.insert({chunk_key, generate_chunk(worldgen, world_size_chunks, corner)});
         return true;
     }

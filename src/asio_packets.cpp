@@ -41,7 +41,7 @@ namespace netwk {
 
     template<typename type>
     std::vector<uint8_t> to_byte_vector(type& input) {
-        std::vector<uint8_t> return_vector;
+        std::vector<uint8_t> return_vector(sizeof(type));
         memcpy(return_vector.data(), &input, sizeof(type));
         return return_vector;
     }

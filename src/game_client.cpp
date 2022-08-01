@@ -915,13 +915,13 @@ int main() {
     //SOCKET client_socket = set_up_socket();
 
     if(!glfwInit()) {
-        printf("Catastrophic Failure! (init)");
+        std::cout << "glfw failure (init)\n";
         return 1;
     }
 
     GLFWwindow* window = glfwCreateWindow(1000, 600, "test", NULL, NULL);
     if(!window) {
-        printf("Catastrophic Failure! (window)");
+        std::cout << "glfw failure (window)\n";
         return 1;
     }
     glfwSetCharCallback(window, char_callback);
@@ -959,8 +959,12 @@ int main() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
 
-    std::array<int, 3> floor_tileset_info, text_img_info;
+    std::array<int, 3> floor_tileset_info, text_img_info, player_spritesheet_info, bandit0_spritesheet_info, bandit1_spritesheet_info;
     uint floor_tileset = generate_texture("res\\tiles\\floor_tileset.png", floor_tileset_info);
+    player_spritesheet = generate_texture("res\\entities\\Player\\avergreen_spritesheet.png", player_spritesheet_info);
+    bandit0_spritesheet = generate_texture("res\\entities\\Bandit\\bandit0_spritesheet.png", bandit0_spritesheet_info);
+    bandit1_spritesheet = generate_texture("res\\entities\\Bandit\\bandit1_spritesheet.png", bandit1_spritesheet_info);
+    text_img = generate_texture("res\\gui\\textsource.png", text_img_info);
 
     int frames = 0;
 
@@ -1025,9 +1029,13 @@ int main() {
 
     text_struct version = {"\\c44fThe Simulation \\c000pre-alpha \\cf440.0.\\x1", 2, 1000};
     connection.start(connection_input_collector, player_map, game_running);
-
-    std::vector<uint8_t> msg_body(player_name.size());
-    memcpy(msg_body.data(), player_name.data(), player_name.size());
+    
+        
+    std::array<char, 64> player_name_array;
+    memcpy(player_name_array.data(), player_name.data(), player_name.size() + 1);
+    
+    netwk::player_join_packet_toserv join_packet{player_name_array, {player.position, player.direction_facing}};
+    std::vector<uint8_t> msg_body = netwk::to_byte_vector(join_packet);
     connection.send(0, msg_body);
 
     while(game_running) {
@@ -1063,9 +1071,6 @@ int main() {
         for(auto& [key, entity] : player_map) {
             entity.tick(delta_time);
         }
-        
-        std::array<char, 64> player_name_array;
-        memcpy(player_name_array.data(), player_name.data(), player_name.size() + 1);
 
         /*netwk::entity_movement_packet_toserv packet{player.position, player.direction_facing};
         std::vector<uint8_t> msg_body(sizeof(netwk::entity_movement_packet_toserv));

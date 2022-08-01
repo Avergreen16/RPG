@@ -4,14 +4,14 @@
 
 #include "global.cpp"
 #include "text.cpp"
+//#include "asio_client.cpp"
 #include "render.cpp"
 
 enum states{IDLE, WALKING, RUNNING, SWIMMING};
 
-std::array<int, 3> player_spritesheet_info, bandit0_spritesheet_info, bandit1_spritesheet_info;
-uint player_spritesheet = generate_texture("res\\entities\\Player\\avergreen_spritesheet.png", player_spritesheet_info);
-uint bandit0_spritesheet = generate_texture("res\\entities\\Bandit\\bandit0_spritesheet.png", bandit0_spritesheet_info);
-uint bandit1_spritesheet = generate_texture("res\\entities\\Bandit\\bandit1_spritesheet.png", bandit1_spritesheet_info);
+uint player_spritesheet;
+uint bandit0_spritesheet;
+uint bandit1_spritesheet;
 
 struct Double_counter {
     double value = 0;
