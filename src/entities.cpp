@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <queue>
+#include <iostream>
 
 #include "global.cpp"
 #include "text.cpp"
@@ -72,7 +73,7 @@ struct Entity {
     std::array<float, 2> visual_offset = {-1, -0.125};
     std::array<double, 2> position = {-0x100, -0x100};
     std::array<int, 2> sprite_size = {32, 32};
-    std::array<int, 2> active_sprite = {0, 3};
+    std::array<int, 2> active_sprite = {3, 2};
 
     Double_counter cycle_timer;
     Int_counter sprite_counter;
@@ -92,7 +93,8 @@ struct Entity {
         this->username = username;
         this->position = position;
         this->direction_facing = direction_facing;
-        this->active_sprite[0] = direction_facing;
+        this->active_sprite[1] = direction_facing;
+        last_input_time = clock();
     }
 
     void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
@@ -118,14 +120,14 @@ struct Entity {
                 previous_packet = movement_queue.front();
                 movement_queue.pop();
                 if(movement_queue.size() != 0) {
-                    double lerp_value = interpolation_time / movement_queue.front().delta_time;
-                    position = {lerp(movement_queue.front().position[0], previous_packet.position[0], lerp_value), lerp(movement_queue.front().position[1], previous_packet.position[1], lerp_value)};
+                    double lerp_value = (movement_queue.front().delta_time == 0) ? 1 : double(interpolation_time) / movement_queue.front().delta_time;
+                    position = {lerp(previous_packet.position[0], movement_queue.front().position[0], lerp_value), lerp(previous_packet.position[1], movement_queue.front().position[1], lerp_value)};
                 } else {
                     position = previous_packet.position;
                 }
             } else {
-                double lerp_value = interpolation_time / movement_queue.front().delta_time;
-                position = {lerp(movement_queue.front().position[0], previous_packet.position[0], lerp_value), lerp(movement_queue.front().position[1], previous_packet.position[1], lerp_value)};
+                double lerp_value = (movement_queue.front().delta_time == 0) ? 1 : double(interpolation_time) / movement_queue.front().delta_time;
+                position = {lerp(previous_packet.position[0], movement_queue.front().position[0], lerp_value), lerp(previous_packet.position[1], movement_queue.front().position[1], lerp_value)};
             }
         }
     }

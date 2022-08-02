@@ -21,9 +21,9 @@ namespace netwk {
 
         TCP_client(unsigned short int target_port);
 
-        void receive_loop(std::vector<std::string>& input_collector, std::unordered_map<uint32_t, Entity>& player_map, bool& game_running);
+        void receive_loop(std::vector<std::string>& input_collector, std::unordered_map<uint64_t, Entity>& player_map, bool& game_running);
 
-        void start(std::vector<std::string>& input_collector, std::unordered_map<uint32_t, Entity>& player_map, bool& game_running);
+        void start(std::vector<std::string>& input_collector, std::unordered_map<uint64_t, Entity>& player_map, bool& game_running);
 
         void send(int id, std::vector<uint8_t>& body);
     };
@@ -33,7 +33,7 @@ namespace netwk {
         asio::connect(socket, endpoint);
     }
 
-    void TCP_client::receive_loop(std::vector<std::string>& input_collector, std::unordered_map<uint32_t, Entity>& player_map, bool& game_running) { // recieves incoming packets and does things with them based on header contents
+    void TCP_client::receive_loop(std::vector<std::string>& input_collector, std::unordered_map<uint64_t, Entity>& player_map, bool& game_running) { // recieves incoming packets and does things with them based on header contents
         if(!game_running) socket.close();
         else {
             std::shared_ptr<std::array<char, sizeof(packet_header)>> buffer(new std::array<char, sizeof(packet_header)>);
@@ -57,28 +57,35 @@ namespace netwk {
                                             std::string message = make_string(reinterpret_cast<char*>(buffer_body->data()), bytes_transferred);
                                             input_collector.push_back(message);
 
-                                            receive_loop(input_collector, player_map, game_running);
+                                            break;
                                         }
                                         case 1: { // player joined
                                             std::cout << "Recieved " << bytes_transferred << " bytes from the server. (player joined)\n";
-                                            player_join_packet_toclient packet = convert_byte_vector<player_join_packet_toclient>(buffer_body->data());
+                                            player_join_packet_toclient recv_packet = from_byte_vector<player_join_packet_toclient>(buffer_body->data());
 
                                             text_struct txt_struct;
-                                            txt_struct.set_values(make_string_array(packet.name.data(), 256), 0x10000, 1);
-                                            player_map.emplace(packet.entity_packet.entity_id, Entity(packet.entity_packet.entity_id, bandit1_spritesheet, txt_struct, packet.entity_packet.position, packet.entity_packet.direction));
+                                            txt_struct.set_values(make_string_array(recv_packet.name.data(), 256), 0x10000, 1);
+                                            player_map.emplace(recv_packet.entity_packet.entity_id, Entity(recv_packet.entity_packet.entity_id, bandit1_spritesheet, txt_struct, recv_packet.entity_packet.position, recv_packet.entity_packet.direction));
 
-                                            receive_loop(input_collector, player_map, game_running);
+                                            break;
                                         }
-                                        /*case 2: { // player position packets
-                                            std::cout << "Recieved " << bytes_transferred << " bytes from the server. (player position)\n";
-                                            entity_movement_packet_toclient packet = convert_byte_vector<entity_movement_packet_toclient>(buffer_body->data());
+                                        case 2: { // player position packets
+                                            //std::cout << "Recieved " << bytes_transferred << " bytes from the server. (player position)\n";
 
-                                            player_map[packet.entity_id].movement_queue.emplace(packet.position, packet.direction);
-                                        }*/
+                                            entity_movement_packet_toclient recv_packet = from_byte_vector<entity_movement_packet_toclient>(buffer_body->data());
+                                            /*if(player_map.contains(recv_packet.entity_id)) {
+                                                player_map.at(recv_packet.entity_id).position = recv_packet.position;
+                                                player_map.at(recv_packet.entity_id).active_sprite[0] = recv_packet.direction;
+                                            }*/
+                                            if(player_map.contains(recv_packet.entity_id)) player_map.at(recv_packet.entity_id).insert_position(recv_packet.position, recv_packet.direction);
+
+                                            break;
+                                        }
                                         default: { // the packet recieved did not have a valid header type if it reaches the default statement
                                             std::cout << "Recieved a packet with an invalid header type.\n";
                                         }
                                     }
+                                    receive_loop(input_collector, player_map, game_running);
                                 }
                             }
                         );
@@ -88,7 +95,7 @@ namespace netwk {
         }
     }
 
-    void TCP_client::start(std::vector<std::string>& input_collector, std::unordered_map<uint32_t, Entity>& player_map, bool& game_running) { // starts the recieve loop
+    void TCP_client::start(std::vector<std::string>& input_collector, std::unordered_map<uint64_t, Entity>& player_map, bool& game_running) { // starts the recieve loop
         recieve_thread = std::thread(
             [this, &input_collector, &player_map, &game_running]() {
                 this->receive_loop(input_collector, player_map, game_running);
@@ -106,9 +113,9 @@ namespace netwk {
             [](const asio::error_code& error_code, size_t bytes) mutable {
                 if(error_code) {
                     std::cout << "Failed to send message to the server.\n";
-                } else {
+                } /*else {
                     std::cout << "Sent " << bytes << " bytes of data to the server.\n";
-                }
+                }*/
             }
         );
     };

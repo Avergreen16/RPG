@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <thread>
 #include <list>
-//#include <winsock2.h>
 
 #include "render.cpp"
 #include "worldgen.cpp"
@@ -17,49 +16,6 @@
 #include "text.cpp"
 #include "asio_client.cpp"
 #include "entities.cpp"
-
-/*struct player_packet {
-    std::array<double, 2> position;
-    std::array<int, 2> active_texture;
-    bool game_running;
-};
-
-SOCKET set_up_socket() {
-    WSADATA wsadata;
-    int wsaerr = WSAStartup(0x0202, &wsadata);
-    if(wsaerr != 0) {
-        std::cout << "WSAStartup error!\n";
-        std::cout << wsadata.szSystemStatus << "\n";
-        return 1;
-    }
-
-    SOCKET client_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(client_socket == INVALID_SOCKET) {
-        std::cout << "socket error!\n";
-        std::cout << WSAGetLastError() << "\n";
-        WSACleanup();
-        return 1;
-    }
-
-    unsigned short int server_port = 16003;
-    std::string server_ip = "127.0.0.1";
-
-    sockaddr_in address;
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr(server_ip.c_str());
-    address.sin_port = htons(server_port);
-
-    if(connect(client_socket, (SOCKADDR*)&address, sizeof(address)) == SOCKET_ERROR) {
-        std::cout << "connect error!\n";
-        std::cout << WSAGetLastError() << "\n";
-        closesocket(client_socket);
-        WSACleanup();
-        return 1;
-    }
-    std::cout << "connection established\n";
-
-    return client_socket;
-}*/
 
 //
 
@@ -89,7 +45,8 @@ std::map<int, bool> key_down_array = {
     {GLFW_KEY_S, false},
     {GLFW_KEY_A, false},
     {GLFW_KEY_D, false},
-    {GLFW_KEY_SPACE, false}
+    {GLFW_KEY_SPACE, false},
+    {GLFW_KEY_LEFT_SHIFT, false}
 };
 
 bool rect_collision(std::array<double, 4> a, std::array<double, 4> b) {
@@ -97,10 +54,6 @@ bool rect_collision(std::array<double, 4> a, std::array<double, 4> b) {
         return true;
     return false;
 }
-
-/*double lerp(double x1, double x2, double lerp_value) {
-    return (x2 - x1) * lerp_value + x1;
-}*/
 
 bool enter_pressed = false;
 
@@ -189,7 +142,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
             }
         }
     } else if(action == GLFW_RELEASE) {
-        if(current_activity == PLAY) {
+        if(current_activity == PLAY && (!key_down_array[GLFW_KEY_LEFT_SHIFT] || key == GLFW_KEY_LEFT_SHIFT)) {
             if(key_down_array.find(key) != key_down_array.end()) key_down_array[key] = false;
         }
     } else if(action == GLFW_REPEAT) {
@@ -327,7 +280,7 @@ struct Player {
     std::array<float, 2> visual_offset = {-1, -0.125};
     std::array<double, 2> position;
     std::array<int, 2> sprite_size = {32, 32};
-    std::array<int, 2> active_sprite = {0, 3};
+    std::array<int, 2> active_sprite = {3, 2};
     std::array<double, 4> walk_box = {-0.375, -0.125, 0.75, 0.25};
 
     Double_counter cycle_timer;
@@ -346,7 +299,7 @@ struct Player {
         return {int(position[0] / 16), int(position[1] / 16)};
     }
 
-    void construct(std::array<double, 2> position, uint image, std::string name) {
+    Player(std::array<double, 2> position, uint image, std::string name) {
         this->position = position;
         spritesheet = image;
         cycle_timer.construct(150);
@@ -521,7 +474,7 @@ struct Enemy {
     std::array<float, 2> visual_offset = {-1, -0.125};
     std::array<double, 2> position = {13150 + 0.5, 8110 + 0.5};
     std::array<int, 2> sprite_size = {32, 32};
-    std::array<int, 2> active_sprite = {0, 1};
+    std::array<int, 2> active_sprite = {3, 2};
 
     Double_counter cycle_timer;
     Int_counter sprite_counter;
@@ -530,7 +483,7 @@ struct Enemy {
     directions direction_moving = SOUTH;
     directions direction_facing = SOUTH;
 
-    void construct(std::array<double, 2> position, uint image) {
+    Enemy(std::array<double, 2> position, uint image) {
         this->position = position;
         spritesheet = image;
         cycle_timer.construct(150);
@@ -538,7 +491,7 @@ struct Enemy {
     }
     
     void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
-        draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 4}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
+        draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 8}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
     }
 
     void tick(double delta) {
@@ -720,90 +673,6 @@ std::unordered_map<int, float> offset_values = {
     {TALL_GRASS, 0.0625f}
 };
 
-/*struct position_time {
-    std::array<double, 2> target_position;
-    int time;
-};
-
-player_packet send_packet;
-
-player_packet recv_packet;
-
-int sign(double val) {
-    if(val > 0) return 1;
-    if(val < 0) return -1;
-    return 0;
-}
-
-struct position_manager {
-    std::array<double, 2> old_position = {0, 0};
-    std::array<double, 2> interpolated_position = {0, 0};
-    std::queue<position_time> position_time_queue;
-    int x_displacement = 0;
-    int y_displacement = 0;
-    int time_container = 0;
-    bool initialized = false;
-    int passes = 0;
-
-    /*void initialize() {
-        if(!initialized) {
-            initialized = true;
-            old_position = position_time_queue.front().target_position;
-            interpolated_position = position_time_queue.front().target_position;
-            sign_x = 
-            sign_y = 
-        }
-    }*/
-
-    /*std::array<double, 2> interpolate(int delta) {
-        if(position_time_queue.size() > 2) delta *= 2;
-        time_container += delta;
-        passes++;
-        if(position_time_queue.size() != 0) {
-            position_time pt = position_time_queue.front();
-            double part_of_time_passed = double(time_container) / pt.time;
-            if(pt.time != 0) {
-                interpolated_position = {old_position[0] - x_displacement * part_of_time_passed, old_position[1] - y_displacement * part_of_time_passed};
-            }
-            if(time_container >= pt.time) {
-                std::cout << passes << " ";
-                passes = 0;
-                time_container = 0;
-                old_position = pt.target_position;
-                interpolated_position = pt.target_position;
-                position_time_queue.pop();
-                x_displacement = old_position[0] - pt.target_position[0];
-                y_displacement = old_position[1] - pt.target_position[1];
-            }
-        }
-        return interpolated_position;
-    }
-};
-
-position_manager pos_manager;
-
-void socket_loop(SOCKET s) {
-    time_t time_container = clock();
-    bool game_running = false;
-    while(game_running) {
-        send(s, (char*)&send_packet, sizeof(player_packet), 0);
-        recv(s, (char*)&recv_packet, sizeof(player_packet), 0);
-        int elapsed_time = clock() - time_container;
-        if(elapsed_time > 100) {
-            pos_manager.position_time_queue.push({recv_packet.position, elapsed_time});
-            time_container = clock();
-        }
-        if(send_packet.game_running) {
-            game_running = true;
-        }
-    }
-    closesocket(s);
-}*/
-
-/*std::unordered_map<int, int> valid_commands = {
-
-};*/
-
 std::vector<std::string> connection_input_collector;
 void process_input(std::string input, Player& player, std::list<text_struct>& chat_list, netwk::TCP_client& connection) {
     if(input[0] == '*') {
@@ -912,8 +781,6 @@ int main() {
     clock_t time_storage = clock();
     clock_t time_storage_frames = clock();
 
-    //SOCKET client_socket = set_up_socket();
-
     if(!glfwInit()) {
         std::cout << "glfw failure (init)\n";
         return 1;
@@ -953,7 +820,6 @@ int main() {
     glEnableVertexAttribArray(1); 
 
     glEnable(GL_DEPTH_TEST);
-    //glDepthMask(GL_FALSE);
     glDepthFunc(GL_LESS);
 
     glEnable(GL_BLEND);
@@ -971,18 +837,14 @@ int main() {
     Worldgen worldgen;
     worldgen.construct_3(0.7707326, 6, 3, 7, 1.5, 4, 4, 3, 1.5, 4, 4, 4, 1.3);
 
-    Player player;
     //Player player1;
-    Enemy enemy0;
-    Enemy enemy1;
     
     std::string player_name;
     std::getline(std::cin, player_name);
 
-    //player1.construct({13155 + 0.5, 8110 + 0.5}, player_spritesheet);
-    player.construct({23472 + 0.5, 10384 + 0.5}, player_spritesheet, player_name);
-    enemy0.construct({23472 + 0.5, 10378 + 0.5}, bandit0_spritesheet);
-    enemy1.construct({23478 + 0.5, 10384 + 0.5}, bandit1_spritesheet);
+    Player player({23472 + 0.5, 10384 + 0.5}, player_spritesheet, player_name);
+    Enemy enemy0({23472 + 0.5, 10378 + 0.5}, bandit0_spritesheet);
+    Enemy enemy1({23478 + 0.5, 10384 + 0.5}, bandit1_spritesheet);
 
     bool c = true;
 
@@ -992,7 +854,7 @@ int main() {
     water_sprite_counter.construct(4);
 
     bool game_running = true;
-    //std::thread t0(socket_loop, client_socket);
+
     std::thread chunk_thread(
         [&game_running, &worldgen, &player]() {
             chunk_gen_thread(game_running, loaded_chunks, active_chunks, world_size_chunks, current_chunk, worldgen, player);
@@ -1024,8 +886,7 @@ int main() {
         }
     );
 
-    //std::thread string_thread(str_thread, std::ref(game_running), std::ref(words));]
-    std::unordered_map<uint32_t, Entity> player_map;
+    std::unordered_map<uint64_t, Entity> player_map;
 
     text_struct version = {"\\c44fThe Simulation \\c000pre-alpha \\cf440.0.\\x1", 2, 1000};
     connection.start(connection_input_collector, player_map, game_running);
@@ -1038,7 +899,20 @@ int main() {
     std::vector<uint8_t> msg_body = netwk::to_byte_vector(join_packet);
     connection.send(0, msg_body);
 
+    time_t packet_time_container = clock();
+
     while(game_running) {
+        // packets
+        time_t current_time = clock();
+        if(current_time - packet_time_container >= 80) {
+            packet_time_container = current_time;
+            netwk::entity_movement_packet_toserv send_packet{player.position, player.direction_facing};
+            std::vector<uint8_t> msg_body = to_byte_vector(send_packet);
+            connection.send(2, msg_body);
+        }
+
+        // window
+
         glfwGetFramebufferSize(window, &width, &height);
         width = width + 1 * (width % 2 == 1);
         height = height + 1 * (height % 2 == 1);
@@ -1071,16 +945,6 @@ int main() {
         for(auto& [key, entity] : player_map) {
             entity.tick(delta_time);
         }
-
-        /*netwk::entity_movement_packet_toserv packet{player.position, player.direction_facing};
-        std::vector<uint8_t> msg_body(sizeof(netwk::entity_movement_packet_toserv));
-        memcpy(msg_body.data(), &packet, sizeof(netwk::entity_movement_packet_toserv));
-        connection.send(2, msg_body);*/
-
-        //player1.position = pos_manager.interpolate(delta_time);
-        //player1.active_sprite = recv_packet.active_texture;
-        //send_packet.position = player.position;
-        //send_packet.active_texture = player.active_sprite;
 
         double a = enemy0.position[0] - int(enemy0.position[0]);
         double b = enemy0.position[1] - int(enemy0.position[1]);
@@ -1158,20 +1022,6 @@ int main() {
                 }
             }
         }
-        
-        /*for(int i = 0; i < total_loaded_chunks; ++i) {
-            uint key = active_chunks[i];
-            if(loaded_chunks.contains(key)) {
-                Chunk_data* chunk = loaded_chunks[key];
-
-                double x_corner = (chunk->corner[0] - camera_pos[0]) * scale;
-                double y_corner = (chunk->corner[1] - camera_pos[1]) * scale;
-
-                if(rect_collision({x_corner, y_corner, 16.0 * scale, 16.0 * scale}, {-width * 0.5, -height * 0.5, double(width), double(height)})) {
-                    
-                }
-            }
-        }*/
 
         player.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
         enemy0.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
@@ -1253,12 +1103,7 @@ int main() {
     glfwDestroyWindow(window);
     glfwTerminate();
 
-    //send_packet.game_running = true;
-    //t0.join();
     chunk_thread.join();
-    //string_thread.join();
-
-    //WSACleanup();
 
     for(auto& [chunk_key, chunk_ptr] : loaded_chunks) {
         delete chunk_ptr;

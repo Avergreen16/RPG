@@ -32,8 +32,19 @@ namespace netwk {
         entity_movement_packet_toclient entity_packet;
     };
 
+    template<typename type>
+    struct packet {
+        packet_header header = {UINT16_MAX, sizeof(type)};
+        type body;
+
+        packet(uint16_t id, type body) {
+            this->header.type = id;
+            this->body = body;
+        }
+    };
+
     template<typename type> 
-    type convert_byte_vector(uint8_t* input_ptr) {
+    type from_byte_vector(uint8_t* input_ptr) {
         type return_object;
         memcpy(&return_object, input_ptr, sizeof(type));
         return return_object;
