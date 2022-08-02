@@ -65,7 +65,7 @@ namespace netwk {
 
                                             text_struct txt_struct;
                                             txt_struct.set_values(make_string_array(recv_packet.name.data(), 256), 0x10000, 1);
-                                            player_map.emplace(recv_packet.entity_packet.entity_id, Entity(recv_packet.entity_packet.entity_id, bandit1_spritesheet, txt_struct, recv_packet.entity_packet.position, recv_packet.entity_packet.direction));
+                                            player_map.emplace(recv_packet.entity_packet.entity_id, Entity(recv_packet.entity_packet.entity_id, player_spritesheet, txt_struct, recv_packet.entity_packet.position, recv_packet.entity_packet.direction));
 
                                             break;
                                         }

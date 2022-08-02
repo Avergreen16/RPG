@@ -112,7 +112,7 @@ struct Entity {
             if(previous_packet.delta_time == UINT32_MAX) previous_packet = movement_queue.front();
 
             direction_facing = movement_queue.front().direction;
-            active_sprite[0] = direction_facing;
+            active_sprite[1] = direction_facing;
             
             interpolation_time += delta;
             if(interpolation_time > movement_queue.front().delta_time) {
