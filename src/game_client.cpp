@@ -63,7 +63,6 @@ int last_direction_key_pressed;
 
 uint current_chunk = 0xffffffffu;
 std::array<uint, total_loaded_chunks> active_chunks;
-std::unordered_map<uint, Chunk_data*> loaded_chunks;
 
 std::string char_callback_string = "";
 std::list<text_struct> chat_list;
@@ -212,16 +211,6 @@ void char_callback(GLFWwindow* window, uint codepoint) {
 }
 
 //world gen
-std::array<int, 2> world_size_chunks = {2450, 1225};
-std::array<int, 2> world_size = {world_size_chunks[0] * 16, world_size_chunks[1] * 16};
-
-std::array<int, 25> offsets = {
-    -2 + 2 * world_size_chunks[0], -1 + 2 * world_size_chunks[0], 2 * world_size_chunks[0], 1 + 2 * world_size_chunks[0], 2 + 2 * world_size_chunks[0],
-    -2 + world_size_chunks[0], -1 + world_size_chunks[0], world_size_chunks[0], 1 + world_size_chunks[0], 2 + world_size_chunks[0],
-    -2, -1, 0, 1, 2,
-    -2 - world_size_chunks[0], -1 - world_size_chunks[0], -world_size_chunks[0], 1 - world_size_chunks[0], 2 - world_size_chunks[0],
-    -2 - 2 * world_size_chunks[0], -1 - 2 * world_size_chunks[0], -2 * world_size_chunks[0], 1 - 2 * world_size_chunks[0], 2 - 2 * world_size_chunks[0]
-};
 
 bool check_point_inclusion(std::array<double, 4> intrect, std::array<double, 2> point) {
     if(point[0] >= intrect[0] && point[0] < intrect[0] + intrect[2] && point[1] >= intrect[1] && point[1] < intrect[1] + intrect[3]) return true;
@@ -283,8 +272,8 @@ struct Player {
     std::array<int, 2> active_sprite = {3, 2};
     std::array<double, 4> walk_box = {-0.375, -0.125, 0.75, 0.25};
 
-    Double_counter cycle_timer;
-    Int_counter sprite_counter;
+    Double_counter cycle_timer = {0, 150};
+    Int_counter sprite_counter = {0, 4};
     Approach speed;
 
     states state = IDLE;
@@ -302,8 +291,6 @@ struct Player {
     Player(std::array<double, 2> position, uint image, std::string name) {
         this->position = position;
         spritesheet = image;
-        cycle_timer.construct(150);
-        sprite_counter.construct(4);
         speed.target = 0.0;
         this->name.set_values(name, 0x10000, 1);
     }
@@ -312,7 +299,7 @@ struct Player {
         draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 8}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
     }
 
-    void tick(double delta) {
+    void tick(uint delta) {
         if(state != IDLE) {
             double change_x = 0.0;
             double change_y = 0.0;
@@ -357,15 +344,12 @@ struct Player {
                     if(keys_pressed) {
                         speed.target = 1.0;
                         speed.modify(0.01 * delta);
-                        if(cycle_timer.increment(delta)) {
-                            sprite_counter.increment();
-                        }
                     } else {
                         speed.target = 0.0;
                         speed.modify(0.02 * delta);
-                        if(cycle_timer.increment(delta * 0.7)) {
-                            sprite_counter.increment();
-                        }
+                    }
+                    if(cycle_timer.increment(delta)) {
+                        sprite_counter.increment();
                     }
                     
                     position[0] += change_x * speed.value;
@@ -378,15 +362,12 @@ struct Player {
                     if(keys_pressed) {
                         speed.target = 1.6;
                         speed.modify(0.01 * delta);
-                        if(cycle_timer.increment(delta * 1.3)) {
-                            sprite_counter.increment();
-                        }
                     } else {
                         speed.target = 0.0;
                         speed.modify(0.02 * delta);
-                        if(cycle_timer.increment(delta * 0.7)) {
-                            sprite_counter.increment();
-                        }
+                    }
+                    if(cycle_timer.increment(delta * 1.3)) {
+                        sprite_counter.increment();
                     }
 
                     position[0] += change_x * speed.value;
@@ -401,15 +382,12 @@ struct Player {
                     if(keys_pressed) {
                         speed.target = 0.5;
                         speed.modify(0.005 * delta, 0.04 * delta);
-                        if(cycle_timer.increment(delta * 0.6)) {
-                            sprite_counter.increment();
-                        }
                     } else {
                         speed.target = 0.0;
                         speed.modify(0.04 * delta);
-                        if(cycle_timer.increment(delta * 0.4)) {
-                            sprite_counter.increment();
-                        }
+                    }
+                    if(cycle_timer.increment(delta * 0.6)) {
+                        sprite_counter.increment();
                     }
 
                     position[0] += change_x * speed.value;
@@ -427,46 +405,6 @@ struct Player {
     }
 };
 
-std::vector<tile_ID> get_blocks_around(std::unordered_map<uint, Chunk_data*> &loaded_chunks, std::array<double, 4> bounding_box) {
-    std::vector<tile_ID> return_vector;
-
-    int lower_x = bounding_box[0];
-    int lower_y = bounding_box[1];
-    int upper_x = bounding_box[0] + bounding_box[2];
-    int upper_y = bounding_box[1] + bounding_box[3];
-
-    for(int y = lower_y; y <= upper_y; ++y) {
-        for(int x = lower_x; x <= upper_x; ++x) {
-            int chunk_x = x / 16;
-            int chunk_y = y / 16;
-            uint chunk_key = chunk_x + chunk_y * world_size_chunks[0];
-            int pos_x = x % 16;
-            int pos_y = y % 16;
-            return_vector.push_back(get_tile(loaded_chunks, chunk_key, pos_x, pos_y));
-        }
-    }
-
-    return return_vector;
-}
-
-std::array<std::array<int, 15>, 15> empty_9x9_array = {
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-};
-
 struct Enemy {
     uint spritesheet;
 
@@ -476,8 +414,8 @@ struct Enemy {
     std::array<int, 2> sprite_size = {32, 32};
     std::array<int, 2> active_sprite = {3, 2};
 
-    Double_counter cycle_timer;
-    Int_counter sprite_counter;
+    Double_counter cycle_timer = {0, 150};
+    Int_counter sprite_counter = {0, 4};
 
     states state = IDLE;
     directions direction_moving = SOUTH;
@@ -486,15 +424,13 @@ struct Enemy {
     Enemy(std::array<double, 2> position, uint image) {
         this->position = position;
         spritesheet = image;
-        cycle_timer.construct(150);
-        sprite_counter.construct(4);
     }
     
     void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
         draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 8}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
     }
 
-    void tick(double delta) {
+    void tick(uint delta) {
         if(state != IDLE) {
             double change_x = 0.0;
             double change_y = 0.0;
@@ -778,8 +714,7 @@ void str_thread(bool &game_running, std::string &str) {
 
 int main() {
     netwk::TCP_client connection(0xa50e);
-    clock_t time_storage = clock();
-    clock_t time_storage_frames = clock();
+    time_t time_storage_frames = clock();
 
     if(!glfwInit()) {
         std::cout << "glfw failure (init)\n";
@@ -843,15 +778,13 @@ int main() {
     std::getline(std::cin, player_name);
 
     Player player({23472 + 0.5, 10384 + 0.5}, player_spritesheet, player_name);
-    Enemy enemy0({23472 + 0.5, 10378 + 0.5}, bandit0_spritesheet);
-    Enemy enemy1({23478 + 0.5, 10384 + 0.5}, bandit1_spritesheet);
 
     bool c = true;
 
     Double_counter water_cycle_timer;
     Int_counter water_sprite_counter;
-    water_cycle_timer.construct(800);
-    water_sprite_counter.construct(4);
+    water_cycle_timer = {0, 800};
+    water_sprite_counter = {0, 4};
 
     bool game_running = true;
 
@@ -900,6 +833,7 @@ int main() {
     connection.send(0, msg_body);
 
     time_t packet_time_container = clock();
+    time_t time_storage_delta = clock();
 
     while(game_running) {
         // packets
@@ -925,9 +859,8 @@ int main() {
         set_player_enums(loaded_chunks, &player);
 
         //math
-        
-        double delta_time = clock() - time_storage;
-        time_storage = clock();
+        uint delta_time = clock() - time_storage_delta;
+        time_storage_delta = clock();
 
         if(enter_pressed) {
             process_input(char_callback_string, player, chat_list, connection);
@@ -946,28 +879,6 @@ int main() {
             entity.tick(delta_time);
         }
 
-        double a = enemy0.position[0] - int(enemy0.position[0]);
-        double b = enemy0.position[1] - int(enemy0.position[1]);
-        if(a < 0.55 && a > 0.45 && b < 0.55 && b > 0.45) {
-            if(c) {
-                enemy0.pathfind(player);
-                if(enemy0.state != IDLE) c = false;
-            }
-        } else {
-            c = true;
-        }
-        enemy0.tick(delta_time);
-        a = enemy1.position[0] - int(enemy1.position[0]);
-        b = enemy1.position[1] - int(enemy1.position[1]);
-        if(a < 0.55 && a > 0.45 && b < 0.55 && b > 0.45) {
-            if(c) {
-                enemy1.pathfind(player);
-                if(enemy1.state != IDLE) c = false;
-            }
-        } else {
-            c = true;
-        }
-        enemy1.tick(delta_time);
         if(water_cycle_timer.increment(delta_time)) water_sprite_counter.increment();
 
         camera_pos = {player.position[0], player.position[1] + 0.875};
@@ -1024,8 +935,6 @@ int main() {
         }
 
         player.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
-        enemy0.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
-        enemy1.render(reference_y, camera_pos, scale, square_shader_program, {width, height});
 
         for(auto& [key, entity] : player_map) {
             entity.render(reference_y, camera_pos, scale, square_shader_program, {width, height});

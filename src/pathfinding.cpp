@@ -6,6 +6,24 @@
 
 #include "global.cpp"
 
+std::array<std::array<int, 15>, 15> empty_9x9_array = {
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    std::array<int, 15>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+};
+
 struct vec_2 {
     int x;
     int y;
@@ -46,7 +64,7 @@ int get_key(vec_2 pos, int width) {
 
 int get_distance(vec_2 pos, vec_2 target) {
     vec_2 distance_vec = {abs(pos.x - target.x), abs(pos.y - target.y)};
-    return abs(10 * (distance_vec.x + distance_vec.y) - 6 * std::min(distance_vec.x, distance_vec.y));
+    return 10 * (distance_vec.x + distance_vec.y) - 6 * std::min(distance_vec.x, distance_vec.y);
 }
 
 template<size_t width, size_t height>

@@ -14,12 +14,14 @@ namespace netwk {
     struct entity_movement_packet_toserv {
         std::array<double, 2> position;
         directions direction;
+        states state;
     };
 
     struct entity_movement_packet_toclient {
         uint64_t entity_id;
         std::array<double, 2> position;
         directions direction;
+        states state;
     };
 
     struct player_join_packet_toserv {

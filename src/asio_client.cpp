@@ -50,7 +50,9 @@ namespace netwk {
                             [this, header_type = header.type, buffer_body, &input_collector, &player_map, &game_running](const asio::error_code& error_code, size_t bytes_transferred) {
                                 if(error_code) {
                                     std::cout << "Error: " << error_code.message() << "\n";
-                                } else { // insert text into input collector to be processed by client
+                                } else { // insert text into input collector to be processed by client     
+                                    receive_loop(input_collector, player_map, game_running); // primes next recieve, this does NOT stall while waiting for new data from the server
+
                                     switch(header_type) {
                                         case 0: { // insert text into input collector to be processed by client
                                             std::cout << "Recieved " << bytes_transferred << " bytes from the server. (chat message)\n";
@@ -73,11 +75,10 @@ namespace netwk {
                                             //std::cout << "Recieved " << bytes_transferred << " bytes from the server. (player position)\n";
 
                                             entity_movement_packet_toclient recv_packet = from_byte_vector<entity_movement_packet_toclient>(buffer_body->data());
-                                            /*if(player_map.contains(recv_packet.entity_id)) {
-                                                player_map.at(recv_packet.entity_id).position = recv_packet.position;
-                                                player_map.at(recv_packet.entity_id).active_sprite[0] = recv_packet.direction;
-                                            }*/
-                                            if(player_map.contains(recv_packet.entity_id)) player_map.at(recv_packet.entity_id).insert_position(recv_packet.position, recv_packet.direction);
+                                            if(player_map.contains(recv_packet.entity_id)) player_map.at(recv_packet.entity_id).insert_position(recv_packet);
+                                            else {
+                                                player_map.emplace(recv_packet.entity_id, Entity(recv_packet.entity_id, player_spritesheet, text_struct{}, recv_packet.position, recv_packet.direction));
+                                            }
 
                                             break;
                                         }
@@ -85,7 +86,6 @@ namespace netwk {
                                             std::cout << "Recieved a packet with an invalid header type.\n";
                                         }
                                     }
-                                    receive_loop(input_collector, player_map, game_running);
                                 }
                             }
                         );

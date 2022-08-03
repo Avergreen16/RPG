@@ -499,3 +499,16 @@ bool insert_chunk(std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, 
     }
     return false;
 }
+
+std::unordered_map<uint, Chunk_data*> loaded_chunks;
+
+std::array<int, 2> world_size_chunks = {2450, 1225};
+std::array<int, 2> world_size = {world_size_chunks[0] * 16, world_size_chunks[1] * 16};
+
+std::array<int, 25> offsets = {
+    -2 + 2 * world_size_chunks[0], -1 + 2 * world_size_chunks[0], 2 * world_size_chunks[0], 1 + 2 * world_size_chunks[0], 2 + 2 * world_size_chunks[0],
+    -2 + world_size_chunks[0], -1 + world_size_chunks[0], world_size_chunks[0], 1 + world_size_chunks[0], 2 + world_size_chunks[0],
+    -2, -1, 0, 1, 2,
+    -2 - world_size_chunks[0], -1 - world_size_chunks[0], -world_size_chunks[0], 1 - world_size_chunks[0], 2 - world_size_chunks[0],
+    -2 - 2 * world_size_chunks[0], -1 - 2 * world_size_chunks[0], -2 * world_size_chunks[0], 1 - 2 * world_size_chunks[0], 2 - 2 * world_size_chunks[0]
+};
