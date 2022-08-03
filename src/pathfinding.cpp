@@ -102,42 +102,6 @@ directions Astar_pathfinding(vec_2 start_pos, vec_2 target_pos, std::array<std::
         vec_2 west_nbr = {current_node.pos.x - 1, current_node.pos.y};
         vec_2 nw_nbr = {current_node.pos.x - 1, current_node.pos.y + 1};
 
-        if(is_valid(ne_nbr, {width, height})) {
-            if(!closed_map.contains(key + width + 1)) {
-                open_queue.push({ne_nbr, current_node.d + 14, get_distance(ne_nbr, target_pos) + current_node.d + 14, key});
-            } /*else if(closed_map[key + width + 1].d > current_node.d + 14) {
-                closed_map.erase(key + width + 1);
-                open_queue.push({ne_nbr, current_node.d + 14, get_distance(ne_nbr, target_pos) + current_node.d + 14, key});
-            }*/
-        }
-
-        if(is_valid(se_nbr, {width, height})) {
-            if(!closed_map.contains(key - width + 1)) {
-                open_queue.push({se_nbr, current_node.d + 14, get_distance(se_nbr, target_pos) + get_distance(se_nbr, start_pos), key});
-            } /*else if(closed_map[key - width + 1.d].d > current_node.d + 14) {
-                closed_map.erase(key + width + 1);
-                open_queue.push({se_nbr, current_node.d + 14, get_distance(se_nbr, target_pos) + get_distance(se_nbr, start_pos), key});
-            }*/
-        }
-
-        if(is_valid(sw_nbr, {width, height})) {
-            if(!closed_map.contains(key - width - 1)) {
-                open_queue.push({sw_nbr, current_node.d + 14, get_distance(sw_nbr, target_pos) + current_node.d + 14, key});
-            } /*else if(closed_map[key - width - 1].d > current_node.d + 14) {
-                closed_map.erase(key - width - 1);
-                open_queue.push({sw_nbr, current_node.d + 14, get_distance(sw_nbr, target_pos) + current_node.d + 14, key});
-            }*/
-        }
-
-        if(is_valid(nw_nbr, {width, height})) {
-            if(!closed_map.contains(key + width - 1)) {
-                open_queue.push({nw_nbr, current_node.d + 14, get_distance(nw_nbr, target_pos) + current_node.d + 14, key});
-            } /*else if(closed_map[key + width - 1].d > current_node.d + 14) {
-                closed_map.erase(key + width - 1);
-                open_queue.push({nw_nbr, current_node.d + 14, get_distance(nw_nbr, target_pos) + current_node.d + 14, key});
-            }*/
-        }
-
         if(is_valid(north_nbr, {width, height})) {
             if(!closed_map.contains(key + width)) {
                 open_queue.push({north_nbr, current_node.d + 10, get_distance(north_nbr, target_pos) + current_node.d + 10, key});
@@ -174,7 +138,41 @@ directions Astar_pathfinding(vec_2 start_pos, vec_2 target_pos, std::array<std::
             }*/
         }
 
+        if(is_valid(ne_nbr, {width, height})) {
+            if(!closed_map.contains(key + width + 1)) {
+                open_queue.push({ne_nbr, current_node.d + 14, get_distance(ne_nbr, target_pos) + current_node.d + 14, key});
+            } /*else if(closed_map[key + width + 1].d > current_node.d + 14) {
+                closed_map.erase(key + width + 1);
+                open_queue.push({ne_nbr, current_node.d + 14, get_distance(ne_nbr, target_pos) + current_node.d + 14, key});
+            }*/
+        }
 
+        if(is_valid(se_nbr, {width, height})) {
+            if(!closed_map.contains(key - width + 1)) {
+                open_queue.push({se_nbr, current_node.d + 14, get_distance(se_nbr, target_pos) + get_distance(se_nbr, start_pos), key});
+            } /*else if(closed_map[key - width + 1.d].d > current_node.d + 14) {
+                closed_map.erase(key + width + 1);
+                open_queue.push({se_nbr, current_node.d + 14, get_distance(se_nbr, target_pos) + get_distance(se_nbr, start_pos), key});
+            }*/
+        }
+
+        if(is_valid(sw_nbr, {width, height})) {
+            if(!closed_map.contains(key - width - 1)) {
+                open_queue.push({sw_nbr, current_node.d + 14, get_distance(sw_nbr, target_pos) + current_node.d + 14, key});
+            } /*else if(closed_map[key - width - 1].d > current_node.d + 14) {
+                closed_map.erase(key - width - 1);
+                open_queue.push({sw_nbr, current_node.d + 14, get_distance(sw_nbr, target_pos) + current_node.d + 14, key});
+            }*/
+        }
+
+        if(is_valid(nw_nbr, {width, height})) {
+            if(!closed_map.contains(key + width - 1)) {
+                open_queue.push({nw_nbr, current_node.d + 14, get_distance(nw_nbr, target_pos) + current_node.d + 14, key});
+            } /*else if(closed_map[key + width - 1].d > current_node.d + 14) {
+                closed_map.erase(key + width - 1);
+                open_queue.push({nw_nbr, current_node.d + 14, get_distance(nw_nbr, target_pos) + current_node.d + 14, key});
+            }*/
+        }
         closed_map.insert({key, current_node});
     }
 
@@ -206,4 +204,5 @@ directions Astar_pathfinding(vec_2 start_pos, vec_2 target_pos, std::array<std::
     } else if(move_pos.x < start_pos.x) {
         return WEST;
     }
+    return NONE;
 }

@@ -13,6 +13,12 @@
 #include "asio_packets.cpp"
 #include "pathfinding.cpp"
 
+const uint max_sends_per_sec = 20;
+const uint max_ticks_per_sec = 100;
+
+const uint sends_mil = 1000000000 / max_sends_per_sec;
+const uint ticks_mil = 1000000000 / max_ticks_per_sec;
+
 time_t __attribute__((always_inline)) get_time() {
     return std::chrono::steady_clock::now().time_since_epoch().count();
 }
@@ -61,7 +67,7 @@ namespace netwk {
                 if(pathfind_bool) {
                     directions dir = NONE;
                     if(entity_map.contains(target_id)) {
-                        directions dir = Astar_pathfinding({7, 7}, {int(entity_map[target_id].position[0] - position[0]) + 7, int(entity_map[target_id].position[1] - position[1]) + 7}, empty_9x9_array);
+                        dir = Astar_pathfinding({7, 7}, {int(entity_map[target_id].position[0] - position[0]) + 7, int(entity_map[target_id].position[1] - position[1]) + 7}, empty_9x9_array);
                     }
                     if(dir != NONE) {
                         pathfind_bool = false;
@@ -119,38 +125,37 @@ namespace netwk {
             pathfind();
 
             if(state != IDLE) {
-                std::cout << delta << "\n";
                 double change_x = 0.0;
                 double change_y = 0.0;
                 
                 switch(direction_moving) {
                     case NORTH:
-                        change_y = 0.006 * delta;
+                        change_y = 0.000000006 * delta;
                         break;
                     case NORTHEAST:
-                        change_x = 0.004243 * delta;
-                        change_y = 0.004243 * delta;
+                        change_x = 0.000000004243 * delta;
+                        change_y = 0.000000004243 * delta;
                         break;
                     case EAST:
-                        change_x = 0.006 * delta;
+                        change_x = 0.000000006 * delta;
                         break;
                     case SOUTHEAST:
-                        change_x = 0.004243 * delta;
-                        change_y = -0.004243 * delta;
+                        change_x = 0.000000004243 * delta;
+                        change_y = -0.000000004243 * delta;
                         break;
                     case SOUTH:
-                        change_y = -0.006 * delta;
+                        change_y = -0.000000006 * delta;
                         break;
                     case SOUTHWEST:
-                        change_x = -0.004243 * delta;
-                        change_y = -0.004243 * delta;
+                        change_x = -0.000000004243 * delta;
+                        change_y = -0.000000004243 * delta;
                         break;
                     case WEST:
-                        change_x = -0.006 * delta;
+                        change_x = -0.000000006 * delta;
                         break;
                     case NORTHWEST:
-                        change_x = -0.004243 * delta;
-                        change_y = 0.004243 * delta;
+                        change_x = -0.000000004243 * delta;
+                        change_y = 0.000000004243 * delta;
                         break;
                 }
 
@@ -320,7 +325,7 @@ namespace netwk {
                 time_t time_container = get_time();
                 while(this->socket.is_open()) {
                     time_t time_tick = get_time();
-                    if(time_tick - time_container >= 40000000) {
+                    if(time_tick - time_container >= sends_mil) {
                         time_container = time_tick;
 
                         for(auto& [id, entity] : entity_map) {

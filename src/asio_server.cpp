@@ -21,10 +21,10 @@ int main() {
     while(run_server) {
         time_t current_time = get_time();
         uint delta_time = current_time - tick_container;
-        if(delta_time >= 15625000) { // max 64 times per second
+        if(delta_time >= ticks_mil) {
             tick_container = current_time;
             for(auto& [id, enemy] : netwk::enemy_map) {
-                enemy.tick(delta_time / 1000000); // turns delta_time into milliseconds
+                enemy.tick(delta_time);
             }
         }
     }
