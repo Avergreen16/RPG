@@ -8,14 +8,13 @@
 #include "text.cpp"
 #include "asio_packets.cpp"
 #include "worldgen.cpp"
-//#include "asio_client.cpp"
 #include "render.cpp"
 
 uint player_spritesheet;
 uint bandit0_spritesheet;
 uint bandit1_spritesheet;
 
-std::vector<tile_ID> get_blocks_around(std::unordered_map<uint, Chunk_data*> &loaded_chunks, std::array<double, 4> bounding_box) {
+std::vector<tile_ID> get_tiles_under(std::unordered_map<uint, Chunk_data>& loaded_chunks, std::array<double, 4> bounding_box) {
     std::vector<tile_ID> return_vector;
 
     int lower_x = bounding_box[0];
@@ -37,36 +36,9 @@ std::vector<tile_ID> get_blocks_around(std::unordered_map<uint, Chunk_data*> &lo
     return return_vector;
 }
 
-struct Double_counter {
-    double value;
-    double limit;
-
-    void construct(double limit) {
-        this->limit = limit;
-    };
-
-    bool increment(double change) {
-        value += change;
-        if(value >= limit) {
-            value = fmod(value, limit);
-            return true;
-        }
-        return false;
-    }
-
-    void set_limit(double new_limit) {
-        limit = new_limit;
-        if(value >= limit) value = 0;
-    }
-
-    void reset() {
-        value = 0;
-    }
-};
-
-struct Int_counter {
-    int value;
-    int limit;
+struct Counter {
+    uint value;
+    uint limit;
 
     bool increment() {
         value++;
@@ -77,7 +49,7 @@ struct Int_counter {
         return false;
     }
 
-    bool increment_by(int change) {
+    bool increment_by(uint change) {
         value += change;
         if(value >= limit) {
             value %= limit;
@@ -89,10 +61,6 @@ struct Int_counter {
     void set_limit(int new_limit) {
         limit = new_limit;
         if(value >= limit) value = 0;
-    }
-
-    void reset() {
-        value = 0;
     }
 };
 
@@ -115,8 +83,8 @@ struct Entity {
     std::array<int, 2> active_sprite = {3, 2};
     std::array<double, 4> walk_box = {-0.375, -0.125, 0.75, 0.25};
 
-    Double_counter cycle_timer = {0, 150};
-    Int_counter sprite_counter = {3, 4};
+    Counter cycle_timer = {0, 150000000};
+    Counter sprite_counter = {3, 4};
 
     states state = IDLE;
     directions direction_facing = SOUTH;
@@ -147,7 +115,7 @@ struct Entity {
         last_input_time = time_container;
     }
 
-    void tick(uint delta) {
+    void tick(uint delta) { // delta is in nanoseconds
         if(movement_queue.size() != 0) {
             if(previous_packet.delta_time == UINT32_MAX) {
                 direction_facing = movement_queue.front().direction;
@@ -179,7 +147,7 @@ struct Entity {
             }
         }
 
-        std::vector<tile_ID> tiles_stepped_on = get_blocks_around(loaded_chunks, {walk_box[0] + position[0], walk_box[1] + position[1], walk_box[2], walk_box[3]});
+        std::vector<tile_ID> tiles_stepped_on = get_tiles_under(loaded_chunks, {walk_box[0] + position[0], walk_box[1] + position[1], walk_box[2], walk_box[3]});
         if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) {
             texture_version = SWIMMING;
             active_sprite[1] = direction_facing + 4;
@@ -194,31 +162,33 @@ struct Entity {
             case IDLE: {
                 switch(texture_version) {
                     case WALKING: {
-                        active_sprite[0] = 3;
+                        cycle_timer.value = 0;
+                        sprite_counter.value = 3;
                         break;
                     }
                     case SWIMMING: {
-                        active_sprite[0] = 1;
+                        cycle_timer.value = 0;
+                        sprite_counter.value = 1;
                         break;
                     }
                 }
                 break;
             }
             case WALKING: {
-                double timer_increment = delta;
+                uint timer_increment = delta;
                 switch(texture_version) {
                     case SWIMMING: {
                         timer_increment *= 0.6;
                         break;
                     }
                 }
-                if(cycle_timer.increment(timer_increment)) {
+                if(cycle_timer.increment_by(timer_increment)) {
                     sprite_counter.increment();
                 }
                 break;
             }
             case RUNNING: {
-                double timer_increment = delta;
+                uint timer_increment = delta;
                 switch(texture_version) {
                     case WALKING: {
                         timer_increment *= 1.3;
@@ -229,7 +199,7 @@ struct Entity {
                         break;
                     }
                 }
-                if(cycle_timer.increment(timer_increment)) {
+                if(cycle_timer.increment_by(timer_increment)) {
                     sprite_counter.increment();
                 }
                 break;

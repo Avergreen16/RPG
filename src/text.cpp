@@ -168,18 +168,18 @@ struct text_struct {
     int len;
     int lines;
     std::vector<int> first_chars = {0};
-    bool length_generated = false;
+    bool data_generated = false;
 
     void set_values(std::string str, int wrap, int size) {
         this->str = str;
         this->wrap = wrap;
         this->size = size;
-        length_generated = false;
+        data_generated = false;
     }
 
-    int get_len() {
-        if(length_generated == false) {
-            length_generated = true;
+    int generate_data() {
+        if(data_generated == false) {
+            data_generated = true;
             lines = 1;
             len = 0;
 

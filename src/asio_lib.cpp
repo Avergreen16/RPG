@@ -261,7 +261,7 @@ namespace netwk {
 
                     std::shared_ptr<std::vector<uint8_t>> buffer_body(new std::vector<uint8_t>(header.size_bytes));
                     this->socket.async_read_some(asio::buffer(buffer_body->data(), buffer_body->size()), 
-                        [this, header_type = header.type, buffer_body, &parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
+                        [this, header_id = header.id, buffer_body, &parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
                             if(error_code) { // if there is an error, disconnect player and tell other clients
                                 std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
 
@@ -273,7 +273,7 @@ namespace netwk {
                                 break_connection = true;
                             } else { // if there isn't an error, do things with the recieved data depending on what the header's id is
                                 recieve_loop(parent_server); // primes next recieve, this does NOT stall the program waiting for data to be recieved
-                                switch(header_type) {
+                                switch(header_id) {
                                     case 0: { // player logged in
                                         std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ". (player logged in)\n";
                                         player_join_packet_toserv recv_packet = from_byte_vector<player_join_packet_toserv>(buffer_body->data());
@@ -330,8 +330,8 @@ namespace netwk {
 
                         for(auto& [id, entity] : entity_map) {
                             if(id != this->associated_entity_id) {
-                                packet<entity_movement_packet_toclient> entity_packet(2, {id, entity.position, entity.direction_facing});
-                                std::vector<uint8_t> send_vector = to_byte_vector<packet<entity_movement_packet_toclient>>(entity_packet);
+                                entity_movement_packet_toclient entity_packet{id, entity.position, entity.direction_facing};
+                                std::vector<uint8_t> send_vector = make_packet(2, (void*)&entity_packet, sizeof(entity_packet));
                                 this->socket.async_send(asio::buffer(send_vector.data(), send_vector.size()), 
                                     [this](const asio::error_code& error_code, size_t bytes_transferred) {
                                         if(error_code) {
@@ -343,8 +343,8 @@ namespace netwk {
                         }
 
                         for(auto& [id, enemy] : enemy_map) {
-                            packet<entity_movement_packet_toclient> entity_packet(2, {id, enemy.position, enemy.direction_facing});
-                            std::vector<uint8_t> send_vector = to_byte_vector<packet<entity_movement_packet_toclient>>(entity_packet);
+                            entity_movement_packet_toclient entity_packet{id, enemy.position, enemy.direction_facing};
+                            std::vector<uint8_t> send_vector = make_packet(2, (void*)&entity_packet, sizeof(entity_packet));
                             this->socket.async_send(asio::buffer(send_vector.data(), send_vector.size()), 
                                 [this](const asio::error_code& error_code, size_t bytes_transferred) {
                                     if(error_code) {

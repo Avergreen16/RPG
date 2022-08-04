@@ -169,7 +169,7 @@ unsigned int create_shader(const char* vertex_shader, const char* fragment_shade
     return shader;
 }
 
-unsigned int generate_texture(char address[], std::array<int, 3> &info) {
+unsigned int load_texture(char address[], std::array<int, 3> &info) {
     unsigned int texture_id;
     glGenTextures(1, &texture_id);
     glBindTexture(GL_TEXTURE_2D, texture_id);
@@ -195,3 +195,12 @@ void draw_tile(unsigned int shader, unsigned int texture, std::array<float, 4> d
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
+
+float vertices[] = {
+    0.0f, 0.0f, 0.0f, 1.0f,
+    1.0f, 0.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 0.0f,
+    1.0f, 1.0f, 1.0f, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f
+};

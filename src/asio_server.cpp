@@ -1,9 +1,5 @@
 #include "asio_lib.cpp"
 
-/*uint __attribute__((always_inline)) per_sec(uint val) {
-    return 1000000000 * (1.0 / val);
-}*/
-
 int main() {
     netwk::TCP_server server(0xa50e);
 

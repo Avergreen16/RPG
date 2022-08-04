@@ -7,7 +7,7 @@
 
 namespace netwk {
     struct packet_header {
-        uint16_t type;
+        uint16_t id;
         uint32_t size_bytes;
     };
 
@@ -34,16 +34,14 @@ namespace netwk {
         entity_movement_packet_toclient entity_packet;
     };
 
-    template<typename type>
-    struct packet {
-        packet_header header = {UINT16_MAX, sizeof(type)};
-        type body;
-
-        packet(uint16_t id, type body) {
-            this->header.type = id;
-            this->body = body;
-        }
-    };
+    std::vector<uint8_t> make_packet(uint16_t id, void* ptr, size_t size_bytes) {
+        std::vector<uint8_t> packet(sizeof(packet_header) + size_bytes);
+        packet_header header{id, size_bytes};
+        memcpy(packet.data(), &header, sizeof(packet_header));
+        memcpy(packet.data() + sizeof(packet_header), ptr, size_bytes);
+        
+        return packet;
+    }
 
     template<typename type> 
     type from_byte_vector(uint8_t* input_ptr) {

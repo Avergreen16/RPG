@@ -202,65 +202,65 @@ struct Chunk_data {
     std::array<int, 2> corner;
 };
 
-tile get_floor_tile(unsigned int biome, Worldgen* worldgen) {
+tile get_floor_tile(unsigned int biome, Worldgen& worldgen) {
     double rand;
     tile_ID tile_type;
     int texture;
     switch(biome) {
         case 0xfffbb3ff:
             tile_type = SAND;
-            rand = worldgen->rng();
+            rand = worldgen.rng();
             if(rand < 0.25) texture = 24;
-            else texture = floor(worldgen->rng() * 4) + 25;
+            else texture = floor(worldgen.rng() * 4) + 25;
             break;
         
         case 0x8bce50ff:
             tile_type = GRASS;
-            rand = worldgen->rng();
-            if(rand < 0.5) texture = floor(worldgen->rng() * 2) + 1;
-            else texture = floor(worldgen->rng() * 5) + 3;
+            rand = worldgen.rng();
+            if(rand < 0.5) texture = floor(worldgen.rng() * 2) + 1;
+            else texture = floor(worldgen.rng() * 5) + 3;
             break;
 
         case 0x008944ff:
             tile_type = GRASS;
-            rand = worldgen->rng();
-            if(rand < 0.5) texture = floor(worldgen->rng() * 2) + 9;
-            else texture = floor(worldgen->rng() * 5) + 11;
+            rand = worldgen.rng();
+            if(rand < 0.5) texture = floor(worldgen.rng() * 2) + 9;
+            else texture = floor(worldgen.rng() * 5) + 11;
             break;
         
         case 0x286059ff:
             tile_type = GRASS;
-            rand = worldgen->rng();
-            if(rand < 0.5) texture = floor(worldgen->rng() * 2) + 16;
-            else texture = floor(worldgen->rng() * 5) + 18;
+            rand = worldgen.rng();
+            if(rand < 0.5) texture = floor(worldgen.rng() * 2) + 16;
+            else texture = floor(worldgen.rng() * 5) + 18;
             break;
         
         case 0xe2dc98ff:
             tile_type = SAND;
-            rand = worldgen->rng();
+            rand = worldgen.rng();
             if(rand < 0.5) texture = 32;
-            else if(rand < 0.9) texture = floor(worldgen->rng() * 2) + 33;
-            else texture = floor(worldgen->rng() * 2) + 35;
+            else if(rand < 0.9) texture = floor(worldgen.rng() * 2) + 33;
+            else texture = floor(worldgen.rng() * 2) + 35;
             break;
         
         case 0xe59647ff:
             tile_type = SAND;
-            rand = worldgen->rng();
+            rand = worldgen.rng();
             if(rand < 0.5) texture = 40;
-            else if(rand < 0.9) texture = floor(worldgen->rng() * 2) + 41;
-            else texture = floor(worldgen->rng() * 2) + 43;
+            else if(rand < 0.9) texture = floor(worldgen.rng() * 2) + 41;
+            else texture = floor(worldgen.rng() * 2) + 43;
             break;
         
         case 0xc8d16aff:
             tile_type = GRASS;
-            rand = worldgen->rng();
-            if(rand < 0.6) texture = floor(worldgen->rng() * 2) + 48;
-            else texture = floor(worldgen->rng() * 5) + 50;
+            rand = worldgen.rng();
+            if(rand < 0.6) texture = floor(worldgen.rng() * 2) + 48;
+            else texture = floor(worldgen.rng() * 5) + 50;
             break;
         
         case 0x00b539ff:
             tile_type = GRASS;
-            texture = floor(worldgen->rng() * 5) + 10;
+            texture = floor(worldgen.rng() * 5) + 10;
             break;
         
         case 0x191fd3ff:
@@ -310,9 +310,9 @@ int get_adjacent_chunk_key(unsigned int chunk_key, std::array<int, 2> world_size
     return new_chunk_pos[0] + new_chunk_pos[1] * world_size_chunks[0];
 }
 
-tile_ID get_tile(std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, unsigned int chunk_key, int x, int y) {
+tile_ID get_tile(std::unordered_map<unsigned int, Chunk_data>& loaded_chunks, unsigned int chunk_key, int x, int y) {
     if(loaded_chunks.contains(chunk_key)) {
-        return loaded_chunks[chunk_key]->floor_tiles[x + y * 16].id;
+        return loaded_chunks[chunk_key].floor_tiles[x + y * 16].id;
     }
     return VOIDTILE;
 }
@@ -343,14 +343,13 @@ int get_texture_variation(tile_ID target, std::array<tile_ID, 4> neighbors) {
     return 0;
 }
 
-tile get_object_tile(unsigned int biome, Worldgen* worldgen) {
+tile get_object_tile(unsigned int biome, Worldgen& worldgen) {
     double rand;
     switch(biome) {
-        
         case 0x8bce50ff:
         case 0xc8d16aff:
-            rand = worldgen->rng();
-            if(rand < 0.15) return {TALL_GRASS, int(worldgen->rng() * 3) + 45};
+            rand = worldgen.rng();
+            if(rand < 0.15) return {TALL_GRASS, int(worldgen.rng() * 3) + 45};
             return {VOIDTILE, 0};
         
         default:
@@ -358,89 +357,89 @@ tile get_object_tile(unsigned int biome, Worldgen* worldgen) {
     }
 }
 
-void update_tile_water(std::unordered_map<unsigned int, Chunk_data*> loaded_chunks, std::array<int, 2> world_size_chunks, unsigned int chunk_key, int x, int y) {
+void update_tile_water(std::unordered_map<unsigned int, Chunk_data>& loaded_chunks, std::array<int, 2> world_size_chunks, unsigned int chunk_key, int x, int y) {
     int i = x + y * 16;
-    if(loaded_chunks[chunk_key]->floor_tiles[i].id == WATER) {
+    if(loaded_chunks[chunk_key].floor_tiles[i].id == WATER) {
         std::array<tile_ID, 4> neighbors;
         if(i % 16 == 15) {
             if(i < 16) {
-                neighbors = {loaded_chunks[chunk_key]->floor_tiles[i + 16].id, get_tile(loaded_chunks, chunk_key - world_size_chunks[0], i, 15), loaded_chunks[chunk_key]->floor_tiles[i - 1].id, get_tile(loaded_chunks, chunk_key + 1, 0, int(i / 16))};
+                neighbors = {loaded_chunks[chunk_key].floor_tiles[i + 16].id, get_tile(loaded_chunks, chunk_key - world_size_chunks[0], i, 15), loaded_chunks[chunk_key].floor_tiles[i - 1].id, get_tile(loaded_chunks, chunk_key + 1, 0, int(i / 16))};
             } else if(i > 239) {
-                neighbors = {get_tile(loaded_chunks, chunk_key + world_size_chunks[0], i % 16, 0), loaded_chunks[chunk_key]->floor_tiles[i - 16].id, loaded_chunks[chunk_key]->floor_tiles[i - 1].id, get_tile(loaded_chunks, chunk_key + 1, 0, int(i / 16))};
+                neighbors = {get_tile(loaded_chunks, chunk_key + world_size_chunks[0], i % 16, 0), loaded_chunks[chunk_key].floor_tiles[i - 16].id, loaded_chunks[chunk_key].floor_tiles[i - 1].id, get_tile(loaded_chunks, chunk_key + 1, 0, int(i / 16))};
             } else {
-                neighbors = {loaded_chunks[chunk_key]->floor_tiles[i + 16].id, loaded_chunks[chunk_key]->floor_tiles[i - 16].id, loaded_chunks[chunk_key]->floor_tiles[i - 1].id, get_tile(loaded_chunks, chunk_key + 1, 0, int(i / 16))};
+                neighbors = {loaded_chunks[chunk_key].floor_tiles[i + 16].id, loaded_chunks[chunk_key].floor_tiles[i - 16].id, loaded_chunks[chunk_key].floor_tiles[i - 1].id, get_tile(loaded_chunks, chunk_key + 1, 0, int(i / 16))};
             }
         } else if(i % 16 == 0) {
             if(i < 16) {
-                neighbors = {loaded_chunks[chunk_key]->floor_tiles[i + 16].id, get_tile(loaded_chunks, chunk_key - world_size_chunks[0], i, 15), get_tile(loaded_chunks, chunk_key - 1, 15, int(i / 16)), loaded_chunks[chunk_key]->floor_tiles[i + 1].id};
+                neighbors = {loaded_chunks[chunk_key].floor_tiles[i + 16].id, get_tile(loaded_chunks, chunk_key - world_size_chunks[0], i, 15), get_tile(loaded_chunks, chunk_key - 1, 15, int(i / 16)), loaded_chunks[chunk_key].floor_tiles[i + 1].id};
             } else if(i > 239) {
-                neighbors = {get_tile(loaded_chunks, chunk_key + world_size_chunks[0], i % 16, 0), loaded_chunks[chunk_key]->floor_tiles[i - 16].id, get_tile(loaded_chunks, chunk_key - 1, 15, int(i / 16)), loaded_chunks[chunk_key]->floor_tiles[i + 1].id};
+                neighbors = {get_tile(loaded_chunks, chunk_key + world_size_chunks[0], i % 16, 0), loaded_chunks[chunk_key].floor_tiles[i - 16].id, get_tile(loaded_chunks, chunk_key - 1, 15, int(i / 16)), loaded_chunks[chunk_key].floor_tiles[i + 1].id};
             } else {
-                neighbors = {loaded_chunks[chunk_key]->floor_tiles[i + 16].id, loaded_chunks[chunk_key]->floor_tiles[i - 16].id, get_tile(loaded_chunks, chunk_key - 1, 15, int(i / 16)), loaded_chunks[chunk_key]->floor_tiles[i + 1].id};
+                neighbors = {loaded_chunks[chunk_key].floor_tiles[i + 16].id, loaded_chunks[chunk_key].floor_tiles[i - 16].id, get_tile(loaded_chunks, chunk_key - 1, 15, int(i / 16)), loaded_chunks[chunk_key].floor_tiles[i + 1].id};
             }
         } else if(i < 16) {
-            neighbors = {loaded_chunks[chunk_key]->floor_tiles[i + 16].id, get_tile(loaded_chunks, chunk_key - world_size_chunks[0], i, 15), loaded_chunks[chunk_key]->floor_tiles[i - 1].id, loaded_chunks[chunk_key]->floor_tiles[i + 1].id};
+            neighbors = {loaded_chunks[chunk_key].floor_tiles[i + 16].id, get_tile(loaded_chunks, chunk_key - world_size_chunks[0], i, 15), loaded_chunks[chunk_key].floor_tiles[i - 1].id, loaded_chunks[chunk_key].floor_tiles[i + 1].id};
         } else if(i > 239) {
-            neighbors = {get_tile(loaded_chunks, chunk_key + world_size_chunks[0], i % 16, 0), loaded_chunks[chunk_key]->floor_tiles[i - 16].id, loaded_chunks[chunk_key]->floor_tiles[i - 1].id, loaded_chunks[chunk_key]->floor_tiles[i + 1].id};
+            neighbors = {get_tile(loaded_chunks, chunk_key + world_size_chunks[0], i % 16, 0), loaded_chunks[chunk_key].floor_tiles[i - 16].id, loaded_chunks[chunk_key].floor_tiles[i - 1].id, loaded_chunks[chunk_key].floor_tiles[i + 1].id};
         } else {
-            neighbors = {loaded_chunks[chunk_key]->floor_tiles[i + 16].id, loaded_chunks[chunk_key]->floor_tiles[i - 16].id, loaded_chunks[chunk_key]->floor_tiles[i - 1].id, loaded_chunks[chunk_key]->floor_tiles[i + 1].id};
+            neighbors = {loaded_chunks[chunk_key].floor_tiles[i + 16].id, loaded_chunks[chunk_key].floor_tiles[i - 16].id, loaded_chunks[chunk_key].floor_tiles[i - 1].id, loaded_chunks[chunk_key].floor_tiles[i + 1].id};
         }
 
         int variation = get_texture_variation(WATER, neighbors);
         switch(variation) {
             case 0:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 56;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 56;
                 break;
             case 1:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 104;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 104;
                 break;
             case 2:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 116;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 116;
                 break;
             case 3:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 112;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 112;
                 break;
             case 4:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 108;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 108;
                 break;
             case 5:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 88;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 88;
                 break;
             case 6:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 92;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 92;
                 break;
             case 7:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 96;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 96;
                 break;
             case 8:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 100;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 100;
                 break;
             case 9:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 84;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 84;
                 break;
             case 10:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 80;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 80;
                 break;
             case 11:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 68;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 68;
                 break;
             case 12:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 64;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 64;
                 break;
             case 13:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 72;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 72;
                 break;
             case 14:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 76;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 76;
                 break;
             case 15:
-                loaded_chunks[chunk_key]->floor_tiles[i].texture = 60;
+                loaded_chunks[chunk_key].floor_tiles[i].texture = 60;
                 break;
         }
     }
 }
 
-void update_chunk_water(std::unordered_map<unsigned int, Chunk_data*> loaded_chunks, std::array<int, 2> world_size_chunks, unsigned int chunk_key) {
+void update_chunk_water(std::unordered_map<unsigned int, Chunk_data>& loaded_chunks, std::array<int, 2> world_size_chunks, unsigned int chunk_key) {
     for(int x = 0; x < 16; x++) {
         for(int y = 0; y < 16; y++) {
             update_tile_water(loaded_chunks, world_size_chunks, chunk_key, x, y);
@@ -472,14 +471,14 @@ void update_chunk_water(std::unordered_map<unsigned int, Chunk_data*> loaded_chu
     }
 }
 
-Chunk_data* generate_chunk(Worldgen* worldgen, std::array<int, 2> world_size_chunks, std::array<int, 2> southwest) {
+Chunk_data generate_chunk(Worldgen& worldgen, std::array<int, 2> world_size_chunks, std::array<int, 2> southwest) {
     std::array<int, 2> world_size = {world_size_chunks[0] * 16, world_size_chunks[1] * 16};
     std::array<tile, 256> floor_tiles;
     std::array<tile, 256> object_tiles;
     for(int x = 0; x < 16; x++) {
         for(int y = 0; y < 16; y++) {
-            std::array<int, 2> position = {southwest[0] + x, (southwest[1] + y)};
-            unsigned int biome = worldgen->retrieve(position, world_size);
+            std::array<int, 2> position = {southwest[0] + x, southwest[1] + y};
+            unsigned int biome = worldgen.retrieve(position, world_size);
 
             tile floor = get_floor_tile(biome, worldgen);
             tile object = get_object_tile(biome, worldgen);
@@ -488,10 +487,10 @@ Chunk_data* generate_chunk(Worldgen* worldgen, std::array<int, 2> world_size_chu
         }
     }
 
-    return new Chunk_data{floor_tiles, object_tiles, southwest};
+    return Chunk_data{floor_tiles, object_tiles, southwest};
 }
 
-bool insert_chunk(std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, std::array<int, 2> world_size_chunks, unsigned int chunk_key, Worldgen* worldgen) {
+bool insert_chunk(std::unordered_map<unsigned int, Chunk_data>& loaded_chunks, std::array<int, 2> world_size_chunks, unsigned int chunk_key, Worldgen& worldgen) {
     if(!loaded_chunks.contains(chunk_key)) {
         std::array<int, 2> corner = {int(chunk_key % world_size_chunks[0] * 16), int(chunk_key / world_size_chunks[0]) * 16};
         loaded_chunks.insert({chunk_key, generate_chunk(worldgen, world_size_chunks, corner)});
@@ -500,7 +499,7 @@ bool insert_chunk(std::unordered_map<unsigned int, Chunk_data*> &loaded_chunks, 
     return false;
 }
 
-std::unordered_map<uint, Chunk_data*> loaded_chunks;
+std::unordered_map<uint, Chunk_data> loaded_chunks;
 
 std::array<int, 2> world_size_chunks = {2450, 1225};
 std::array<int, 2> world_size = {world_size_chunks[0] * 16, world_size_chunks[1] * 16};
