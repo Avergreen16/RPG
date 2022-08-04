@@ -8,8 +8,6 @@
 #include "global.cpp"
 #include "render.cpp"
 
-uint text_img;
-
 std::unordered_map<char, std::array<int, 2>> standard_chars = {
     {'A', {0, 6}},
     {'B', {6, 6}},

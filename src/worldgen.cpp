@@ -8,6 +8,9 @@
 
 #include "global.cpp"
 
+const double PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062;
+const double SQRT1_2 = sqrt(2) / 2;
+
 int w, h, nrChannels;
 unsigned char* biome_map_terra = stbi_load("biome_map_t0.png", &w, &h, &nrChannels, 4);
 
@@ -38,7 +41,7 @@ double clamp(double input, double min, double max) {
 
 double normalCDF(double input, double sd, double mean) {
     double value = (input - mean) / sd;
-    return 0.5 * erfc(-value * M_SQRT1_2);
+    return 0.5 * erfc(-value * SQRT1_2);
 }
 
 double dotproduct(std::array<double, 2> v1, std::array<double, 2> v2) {
@@ -103,7 +106,7 @@ void PerlinNoiseFactory::generate_vectors() {
     }
     else if(!loop_y) num_vectors += array_width;
     for(int k = 0; k < num_vectors; k++) {
-        double theta = rng() * 2 * M_PI;
+        double theta = rng() * 2 * PI;
         std::array<double, 2> insertvector = {std::cos(theta), std::sin(theta)};
         vector_container.push_back(insertvector);
     }
@@ -155,7 +158,7 @@ double PerlinNoiseFactory::retrieve(double x, double y, double width, double hei
         //(double)(coordinate % scale) / scale
         double x1 = interpolate(dotproducts[0], dotproducts[1], fmod(double(x), updated_xscale) / updated_xscale);
         double x2 = interpolate(dotproducts[2], dotproducts[3], fmod(double(x), updated_xscale) / updated_xscale);
-        returnvalue += (interpolate(x1, x2 , fmod(double(y), updated_yscale) / updated_yscale) + M_SQRT1_2) / (M_SQRT1_2 * 2) * pow(persistance, -i);
+        returnvalue += (interpolate(x1, x2 , fmod(double(y), updated_yscale) / updated_yscale) + SQRT1_2) / (SQRT1_2 * 2) * pow(persistance, -i);
     }
     if(sd != 0) return normalCDF(returnvalue / maxvalue, sd, mean);
     return returnvalue / maxvalue;
@@ -498,8 +501,6 @@ bool insert_chunk(std::unordered_map<unsigned int, Chunk_data>& loaded_chunks, s
     }
     return false;
 }
-
-std::unordered_map<uint, Chunk_data> loaded_chunks;
 
 std::array<int, 2> world_size_chunks = {2450, 1225};
 std::array<int, 2> world_size = {world_size_chunks[0] * 16, world_size_chunks[1] * 16};

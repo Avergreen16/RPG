@@ -3,6 +3,7 @@
 #include <queue>
 #include <iostream>
 #include <algorithm>
+#include <chrono>
 
 #include "global.cpp"
 #include "text.cpp"
@@ -10,9 +11,9 @@
 #include "worldgen.cpp"
 #include "render.cpp"
 
-uint player_spritesheet;
-uint bandit0_spritesheet;
-uint bandit1_spritesheet;
+time_t __attribute__((always_inline)) get_time() {
+    return std::chrono::steady_clock::now().time_since_epoch().count();
+}
 
 std::vector<tile_ID> get_tiles_under(std::unordered_map<uint, Chunk_data>& loaded_chunks, std::array<double, 4> bounding_box) {
     std::vector<tile_ID> return_vector;
@@ -76,6 +77,8 @@ struct Entity {
     uint spritesheet;
     text_struct username;
 
+    std::unordered_map<uint, Chunk_data>& loaded_chunks;
+
     std::array<float, 2> visual_size = {2, 2};
     std::array<float, 2> visual_offset = {-1, -0.125};
     std::array<double, 2> position = {-0x100, -0x100};
@@ -95,14 +98,14 @@ struct Entity {
     time_t last_input_time;
     uint interpolation_time = 0;
 
-    Entity(uint64_t id, uint spritesheet, text_struct username, std::array<double, 2> position, directions direction_facing) {
+    Entity(uint64_t id, uint spritesheet, text_struct username, std::array<double, 2> position, directions direction_facing, std::unordered_map<uint, Chunk_data>& loaded_chunks_ref) : loaded_chunks(loaded_chunks_ref) {
         this->id = id;
         this->spritesheet = spritesheet;
         this->username = username;
         this->position = position;
         this->direction_facing = direction_facing;
         this->active_sprite[1] = direction_facing;
-        last_input_time = clock();
+        last_input_time = get_time();
     }
 
     void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
@@ -110,7 +113,7 @@ struct Entity {
     }
 
     int insert_position(netwk::entity_movement_packet_toclient input_packet) {
-        time_t time_container = clock();
+        time_t time_container = get_time();
         movement_queue.emplace(entity_queue_struct{input_packet.position, input_packet.direction, input_packet.state, uint(time_container - last_input_time)});
         last_input_time = time_container;
     }
