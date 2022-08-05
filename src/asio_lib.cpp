@@ -23,7 +23,7 @@ time_t __attribute__((always_inline)) get_time() {
     return std::chrono::steady_clock::now().time_since_epoch().count();
 }
 
-double get_tiled_distance(std::array<double, 2> pos_0, std::array<double, 2> pos_1) {
+double get_8dir_distance(std::array<double, 2> pos_0, std::array<double, 2> pos_1) {
     double dist_x = abs(pos_0[0] - pos_1[0]);
     double dist_y = abs(pos_0[1] - pos_1[1]);
     return (dist_x + dist_y) - 0.6 * std::min(dist_x, dist_y);
@@ -46,11 +46,12 @@ namespace netwk {
 
     struct Server_enemy {
         std::array<double, 2> position = {13150 + 0.5, 8110 + 0.5};
-
+        
         states state = IDLE;
         directions direction_moving = SOUTH;
         directions direction_facing = SOUTH;
 
+        bool target_aquired = false;
         bool pathfind_bool = true;
 
         uint64_t target_id = UINT64_MAX;
@@ -65,11 +66,12 @@ namespace netwk {
             double y_within_tile = position[1] - int(position[1]);
             if(x_within_tile > 0.45 && x_within_tile < 0.55 && y_within_tile > 0.45 && y_within_tile < 0.55) {
                 if(pathfind_bool) {
-                    directions dir = NONE;
+                    directions dir = OUT_OF_RANGE;
                     if(entity_map.contains(target_id)) {
                         dir = Astar_pathfinding({7, 7}, {int(entity_map[target_id].position[0] - position[0]) + 7, int(entity_map[target_id].position[1] - position[1]) + 7}, empty_9x9_array);
                     }
-                    if(dir != NONE) {
+                    if(!(dir == NONE || dir == OUT_OF_RANGE)) {
+                        target_aquired = true;
                         pathfind_bool = false;
                         state = WALKING;
                         direction_moving = dir;
@@ -95,6 +97,11 @@ namespace netwk {
                                 break;
                         }
                     } else {
+                        if(dir == OUT_OF_RANGE) {
+                            target_aquired = false;
+                        } else {
+                            target_aquired = true;
+                        }
                         state = IDLE;
                     }
                 }
@@ -104,19 +111,14 @@ namespace netwk {
         }
 
         void tick(uint delta) {
-            if(target_id == UINT64_MAX || !entity_map.contains(target_id) || get_mht_distance(position, entity_map[target_id].position) > 8) {
+            if(target_aquired == false) {
                 uint64_t id_container = UINT64_MAX;
-                double distance_container;
+                double distance_container = __DBL_MAX__;
                 for(auto& [id, entity] : entity_map) {
-                    if(id_container != UINT64_MAX) {
-                        double distance_to_entity = get_tiled_distance(position, entity.position);
-                        if(distance_to_entity > distance_container) {
-                            id_container = id;
-                            distance_container = distance_to_entity;
-                        }
-                    } else {
+                    double distance_to_entity = get_8dir_distance(position, entity.position);
+                    if(distance_to_entity < distance_container) {
                         id_container = id;
-                        distance_container = get_tiled_distance(position, entity.position);
+                        distance_container = distance_to_entity;
                     }
                 }
                 target_id = id_container;

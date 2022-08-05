@@ -127,21 +127,27 @@ struct Entity {
             
             interpolation_time += delta;
             if(interpolation_time > movement_queue.front().delta_time) { // switch packets
-                interpolation_time -= movement_queue.front().delta_time;
-                previous_packet = movement_queue.front();
-                movement_queue.pop();
-                direction_facing = movement_queue.front().direction;
-                if(previous_packet.position[0] == movement_queue.front().position[0] &&
-                previous_packet.position[1] == movement_queue.front().position[1]) {
-                    state = IDLE;
-                } else {
-                    state = (movement_queue.front().state == IDLE) ? WALKING : movement_queue.front().state;
+                // fix overinterpolation when frame rate is low
+                while(interpolation_time > movement_queue.front().delta_time && movement_queue.size() != 0) {
+                    interpolation_time -= movement_queue.front().delta_time;
+                    previous_packet = movement_queue.front();
+                    movement_queue.pop();
                 }
 
                 if(movement_queue.size() != 0) {
+                    direction_facing = movement_queue.front().direction;
+                    if(previous_packet.position[0] == movement_queue.front().position[0] &&
+                    previous_packet.position[1] == movement_queue.front().position[1]) {
+                        state = IDLE;
+                    } else {
+                        state = (movement_queue.front().state == IDLE) ? WALKING : movement_queue.front().state;
+                    }
+
                     double lerp_value = (movement_queue.front().delta_time == 0) ? 1.0 : double(interpolation_time) / movement_queue.front().delta_time;
                     position = {lerp(previous_packet.position[0], movement_queue.front().position[0], lerp_value), lerp(previous_packet.position[1], movement_queue.front().position[1], lerp_value)};
                 } else {
+                    direction_facing = previous_packet.direction;
+                    state = IDLE;
                     position = previous_packet.position;
                 }
             } else {

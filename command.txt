@@ -89,3 +89,8 @@ server -> client:
 1 - player joined
 2 - player position
 3 - chunk contents
+
+fix:
+
+- client entity position overinterpolation when frame rate is low
+- server entity doesn't search for new target when old target goes out of reach

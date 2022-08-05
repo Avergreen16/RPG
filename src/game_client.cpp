@@ -1,4 +1,7 @@
-#include "client_setting_and_asio_client.cpp"
+#include "client_setting.hpp"
+#include "client_setting.cpp"
+#include "asio_client.hpp"
+#include "asio_client.cpp"
 
 const uint pos_send_per_sec = 45;
 const uint pos_send_mil = 1000000000 / pos_send_per_sec;

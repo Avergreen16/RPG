@@ -43,7 +43,7 @@ namespace netwk {
 
                                             text_struct txt_struct;
                                             txt_struct.set_values(make_string_array(recv_packet.name.data(), 256), 0x10000, 1);
-                                            setting.entity_map.emplace(recv_packet.entity_packet.entity_id, Entity(recv_packet.entity_packet.entity_id, setting.texture_map[2].id, txt_struct, recv_packet.entity_packet.position, recv_packet.entity_packet.direction));
+                                            setting.entity_map.emplace(recv_packet.entity_packet.entity_id, Entity(recv_packet.entity_packet.entity_id, setting.texture_map[2].id, txt_struct, recv_packet.entity_packet.position, recv_packet.entity_packet.direction, setting.loaded_chunks));
 
                                             break;
                                         }
@@ -53,7 +53,7 @@ namespace netwk {
                                             entity_movement_packet_toclient recv_packet = from_byte_vector<entity_movement_packet_toclient>(buffer_body->data());
                                             if(setting.entity_map.contains(recv_packet.entity_id)) setting.entity_map.at(recv_packet.entity_id).insert_position(recv_packet);
                                             else {
-                                                setting.entity_map.emplace(recv_packet.entity_id, Entity(recv_packet.entity_id, setting.texture_map[2].id, text_struct{}, recv_packet.position, recv_packet.direction));
+                                                setting.entity_map.emplace(recv_packet.entity_id, Entity(recv_packet.entity_id, setting.texture_map[2].id, text_struct{}, recv_packet.position, recv_packet.direction, setting.loaded_chunks));
                                             }
 
                                             break;

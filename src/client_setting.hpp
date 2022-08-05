@@ -71,6 +71,7 @@ struct Player {
 
     text_struct name;
 
+    Player() = default;
     Player(std::array<double, 2> position, uint texture_id, std::string name);
     
     void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size);
@@ -111,7 +112,7 @@ struct Setting {
     // chat
     game_activity current_activity = PLAY;
 
-    std::string char_callback_string = "";
+    std::string chat_input_string = "";
     std::list<text_struct> chat_list;
     int type_pos = 0; // position in string of cursor
     int type_start = 0; // position in string of leftmost displayed char

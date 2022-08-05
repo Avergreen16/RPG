@@ -69,8 +69,10 @@ int get_distance(vec_2 pos, vec_2 target) {
 
 template<size_t width, size_t height>
 directions Astar_pathfinding(vec_2 start_pos, vec_2 target_pos, std::array<std::array<int, height>, width> input_array) {
-    if(start_pos == target_pos || !is_valid(target_pos, {width, height})) {
+    if(start_pos == target_pos) {
         return NONE;
+    } else if(!is_valid(target_pos, {width, height})) {
+        return OUT_OF_RANGE;
     }
     
     std::priority_queue<node, std::vector<node>, compare_node> open_queue;
