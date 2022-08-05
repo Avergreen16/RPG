@@ -139,7 +139,7 @@ struct Setting {
     // chat
     game_activity current_activity = PLAY;
 
-    std::string char_callback_string = "";
+    std::string chat_input_string = "";
     std::list<text_struct> chat_list;
     int type_pos = 0; // position in string of cursor
     int type_start = 0; // position in string of leftmost displayed char
@@ -331,12 +331,10 @@ void Player::render(int reference_y, std::array<double, 2> camera_pos, float sca
 }
 
 void Player::tick(uint delta) { // delta is in nanoseconds
-    if(state != IDLE) {
-        double change_x = 0.0;
-        double change_y = 0.0;
+    double change_x = 0.0;
+    double change_y = 0.0;
 
-        active_sprite[1] = direction_facing;
-        
+    if(state != IDLE) {
         switch(direction_moving) {
             case NORTH:
                 change_y = 0.000000006 * delta;
@@ -367,72 +365,69 @@ void Player::tick(uint delta) { // delta is in nanoseconds
                 change_y = 0.000000004243 * delta;
                 break;
         }
-        
-        switch(state) {
-            case WALKING:
-                texture_version = WALKING;
-                sprite_counter.limit = 4;
-                if(keep_moving) {
-                    speed.target = 1.0;
-                    speed.modify(0.00000001 * delta);
-                } else {
-                    speed.target = 0.0;
-                    speed.modify(0.00000002 * delta);
-                }
-                if(cycle_timer.increment_by(delta)) {
-                    sprite_counter.increment();
-                }
-                
-                position[0] += change_x * speed.value;
-                position[1] += change_y * speed.value;
-                break;
-
-            case RUNNING:
-                texture_version = WALKING;
-                sprite_counter.limit = 4;
-                if(keep_moving) {
-                    speed.target = 1.6;
-                    speed.modify(0.00000001 * delta);
-                } else {
-                    speed.target = 0.0;
-                    speed.modify(0.00000002 * delta);
-                }
-                if(cycle_timer.increment_by(delta * 1.3)) {
-                    sprite_counter.increment();
-                }
-
-                position[0] += change_x * speed.value;
-                position[1] += change_y * speed.value;
-                break;
-
-            case SWIMMING:
-                texture_version = SWIMMING;
-                sprite_counter.limit = 2;
-                if(sprite_counter.value > 1) sprite_counter.value = 0;
-                active_sprite[1] = direction_facing + 4;
-                if(keep_moving) {
-                    speed.target = 0.5;
-                    speed.modify(0.000000005 * delta, 0.00000004 * delta);
-                } else {
-                    speed.target = 0.0;
-                    speed.modify(0.00000004 * delta);
-                }
-                if(cycle_timer.increment_by(delta * 0.6)) {
-                    sprite_counter.increment();
-                }
-
-                position[0] += change_x * speed.value;
-                position[1] += change_y * speed.value;
-                break;
-        }
-
-        active_sprite[0] = sprite_counter.value;
-    } else {
-        sprite_counter.value = 0;
-        cycle_timer.value = 0;
-        if(texture_version == WALKING) active_sprite[0] = 3;
-        else if(texture_version == SWIMMING) active_sprite[0] = 1;
     }
+        
+    switch(state) {
+        case IDLE: {
+            cycle_timer.value = cycle_timer.limit - 1;
+            if(texture_version == WALKING) sprite_counter.value = 3;
+            else if(texture_version == SWIMMING) sprite_counter.value = 1;
+            break;
+        }
+        case WALKING: {
+            active_sprite[1] = direction_facing;
+            if(keep_moving) {
+                speed.target = 1.0;
+                speed.modify(0.00000001 * delta);
+            } else {
+                speed.target = 0.0;
+                speed.modify(0.00000002 * delta);
+            }
+            if(cycle_timer.increment_by(delta)) {
+                sprite_counter.increment();
+            }
+            
+            position[0] += change_x * speed.value;
+            position[1] += change_y * speed.value;
+            break;
+        }
+        case RUNNING: {
+            active_sprite[1] = direction_facing;
+            if(keep_moving) {
+                speed.target = 1.6;
+                speed.modify(0.00000001 * delta);
+            } else {
+                speed.target = 0.0;
+                speed.modify(0.00000002 * delta);
+            }
+            if(cycle_timer.increment_by(delta * 1.3)) {
+                sprite_counter.increment();
+            }
+
+            position[0] += change_x * speed.value;
+            position[1] += change_y * speed.value;
+            break;
+        }
+        case SWIMMING: {
+            active_sprite[1] = direction_facing + 4;
+            if(keep_moving) {
+                speed.target = 0.5;
+                speed.modify(0.000000005 * delta, 0.00000004 * delta);
+            } else {
+                speed.target = 0.0;
+                speed.modify(0.00000004 * delta);
+            }
+            if(cycle_timer.increment_by(delta * 0.6)) {
+                sprite_counter.increment();
+            }
+
+            position[0] += change_x * speed.value;
+            position[1] += change_y * speed.value;
+            break;
+        }
+    }
+
+    active_sprite[0] = sprite_counter.value;
 }
 
 bool Setting::check_if_moved_chunk() {
@@ -566,12 +561,19 @@ void Setting::set_player_enums(directions dir_moving, directions dir_facing) {
     player.keep_moving = true;
 
     std::vector<tile_ID> tiles_stepped_on = get_tiles_under(loaded_chunks, {player.walk_box[0] + player.position[0], player.walk_box[1] + player.position[1], player.walk_box[2], player.walk_box[3]});
-    if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) 
+    if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) {
+        player.texture_version = SWIMMING;
+        player.sprite_counter.set_limit(2);
         player.state = SWIMMING;
-    else if(key_down_array[GLFW_KEY_SPACE]) 
+    } else if(key_down_array[GLFW_KEY_SPACE]) {
+        player.texture_version = WALKING;
+        player.sprite_counter.set_limit(4);
         player.state = RUNNING;
-    else 
+    } else {
+        player.texture_version = WALKING;
+        player.sprite_counter.set_limit(4);
         player.state = WALKING;
+    }
 }
 
 void Setting::set_player_enums() {
@@ -581,12 +583,19 @@ void Setting::set_player_enums() {
         player.state = IDLE;
     else {
         std::vector<tile_ID> tiles_stepped_on = get_tiles_under(loaded_chunks, {player.walk_box[0] + player.position[0], player.walk_box[1] + player.position[1], player.walk_box[2], player.walk_box[3]});
-        if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) 
+        if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) {
+            player.texture_version = SWIMMING;
+            player.sprite_counter.set_limit(2);
             player.state = SWIMMING;
-        else if(key_down_array[GLFW_KEY_SPACE]) 
+        } else if(key_down_array[GLFW_KEY_SPACE]) {
+            player.texture_version = WALKING;
+            player.sprite_counter.set_limit(4);
             player.state = RUNNING;
-        else 
+        } else {
+            player.texture_version = WALKING;
+            player.sprite_counter.set_limit(4);
             player.state = WALKING;
+        }
     }
 }
 
@@ -636,14 +645,14 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
                 setting->current_chunk = 0xffffffffu;
             } else if(key == GLFW_KEY_T) {
                 setting->current_activity = CHAT;
-                setting->char_callback_string = "";
+                setting->chat_input_string = "";
             }
         } else if(setting->current_activity == CHAT) {
             if(key == GLFW_KEY_BACKSPACE) {
-                if(setting->char_callback_string.size() != 0 && setting->type_pos != 0) {
+                if(setting->chat_input_string.size() != 0 && setting->type_pos != 0) {
                     int char_pos = setting->type_pos - 1;
-                    if(standard_chars.contains(setting->char_callback_string[char_pos])) setting->type_len -= standard_chars[setting->char_callback_string[char_pos]][1] * 2 + 2;
-                    setting->char_callback_string.erase(setting->char_callback_string.begin() + char_pos);
+                    if(standard_chars.contains(setting->chat_input_string[char_pos])) setting->type_len -= standard_chars[setting->chat_input_string[char_pos]][1] * 2 + 2;
+                    setting->chat_input_string.erase(setting->chat_input_string.begin() + char_pos);
                     --setting->type_pos;
                     if(setting->type_pos < setting->type_start) {
                         --setting->type_start;
@@ -656,24 +665,24 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
                 setting->type_start = 0;
                 setting->type_len = 0;
                 setting->chat_line = std::max(setting->total_chat_lines - 12, 0);
-                setting->char_callback_string = "";
+                setting->chat_input_string = "";
             } else if(key == GLFW_KEY_ENTER) {
                 setting->send_chat_message = true;
             } else if(key == GLFW_KEY_LEFT) {
-                if(setting->char_callback_string.size() != 0 && setting->type_pos != 0) {
+                if(setting->chat_input_string.size() != 0 && setting->type_pos != 0) {
                     --setting->type_pos;
-                    if(standard_chars.contains(setting->char_callback_string[setting->type_pos])) setting->type_len -= standard_chars[setting->char_callback_string[setting->type_pos]][1] * 2 + 2;
+                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_pos]][1] * 2 + 2;
                     if(setting->type_pos < setting->type_start) {
                         --setting->type_start;
                         setting->type_len = 0;
                     }
                 }
             } else if(key == GLFW_KEY_RIGHT) {
-                if(setting->char_callback_string.size() != 0 && setting->type_pos < setting->char_callback_string.size()) {
-                    if(standard_chars.contains(setting->char_callback_string[setting->type_pos])) setting->type_len += standard_chars[setting->char_callback_string[setting->type_pos]][1] * 2 + 2;
+                if(setting->chat_input_string.size() != 0 && setting->type_pos < setting->chat_input_string.size()) {
+                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len += standard_chars[setting->chat_input_string[setting->type_pos]][1] * 2 + 2;
                     ++setting->type_pos;
                     while(setting->type_len >= setting->width - 20) {
-                        if(standard_chars.contains(setting->char_callback_string[setting->type_start])) setting->type_len -= standard_chars[setting->char_callback_string[setting->type_start]][1] * 2 + 2;
+                        if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_start]][1] * 2 + 2;
                         ++setting->type_start;
                     }
                 }
@@ -686,10 +695,10 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
     } else if(action == GLFW_REPEAT) {
         if(setting->current_activity == CHAT) {
             if(key == GLFW_KEY_BACKSPACE) {
-                if(setting->char_callback_string.size() != 0 && setting->type_pos != 0) {
+                if(setting->chat_input_string.size() != 0 && setting->type_pos != 0) {
                     int char_pos = setting->type_pos - 1;
-                    if(standard_chars.contains(setting->char_callback_string[char_pos])) setting->type_len -= standard_chars[setting->char_callback_string[char_pos]][1] * 2 + 2;
-                    setting->char_callback_string.erase(setting->char_callback_string.begin() + char_pos);
+                    if(standard_chars.contains(setting->chat_input_string[char_pos])) setting->type_len -= standard_chars[setting->chat_input_string[char_pos]][1] * 2 + 2;
+                    setting->chat_input_string.erase(setting->chat_input_string.begin() + char_pos);
                     --setting->type_pos;
                     if(setting->type_pos < setting->type_start) {
                         --setting->type_start;
@@ -697,20 +706,20 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
                     }
                 }
             } else if(key == GLFW_KEY_LEFT) {
-                if(setting->char_callback_string.size() != 0 && setting->type_pos != 0) {
+                if(setting->chat_input_string.size() != 0 && setting->type_pos != 0) {
                     --setting->type_pos;
-                    if(standard_chars.contains(setting->char_callback_string[setting->type_pos])) setting->type_len -= standard_chars[setting->char_callback_string[setting->type_pos]][1] * 2 + 2;
+                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_pos]][1] * 2 + 2;
                     if(setting->type_pos < setting->type_start) {
                         --setting->type_start;
                         setting->type_len = 0;
                     }
                 }
             } else if(key == GLFW_KEY_RIGHT) {
-                if(setting->char_callback_string.size() != 0 && setting->type_pos < setting->char_callback_string.size()) {
-                    if(standard_chars.contains(setting->char_callback_string[setting->type_pos])) setting->type_len += standard_chars[setting->char_callback_string[setting->type_pos]][1] * 2 + 2;
+                if(setting->chat_input_string.size() != 0 && setting->type_pos < setting->chat_input_string.size()) {
+                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len += standard_chars[setting->chat_input_string[setting->type_pos]][1] * 2 + 2;
                     ++setting->type_pos;
                     while(setting->type_len >= setting->width - 20) {
-                        if(standard_chars.contains(setting->char_callback_string[setting->type_start])) setting->type_len -= standard_chars[setting->char_callback_string[setting->type_start]][1] * 2 + 2;
+                        if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_start]][1] * 2 + 2;
                         ++setting->type_start;
                     }
                 }
@@ -742,10 +751,10 @@ void Setting::char_callback(GLFWwindow* window, uint codepoint) {
     Setting* setting = (Setting*)(glfwGetWindowUserPointer(window));
     if(setting->current_activity == CHAT) {
         if(standard_chars.contains(codepoint)) setting->type_len += standard_chars[codepoint][1] * 2 + 2;
-        setting->char_callback_string.insert(setting->char_callback_string.begin() + setting->type_pos, codepoint);
+        setting->chat_input_string.insert(setting->chat_input_string.begin() + setting->type_pos, codepoint);
         ++setting->type_pos;
         while(setting->type_len >= setting->width - 20) {
-            if(standard_chars.contains(setting->char_callback_string[setting->type_start])) setting->type_len -= standard_chars[setting->char_callback_string[setting->type_start]][1] * 2 + 2;
+            if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_start]][1] * 2 + 2;
             ++setting->type_start;
         }
     }
@@ -784,8 +793,8 @@ void Setting::game_math(uint delta) {
     process_key_inputs();
 
     if(send_chat_message) {
-        process_input(char_callback_string, player, chat_list, connection);
-        char_callback_string = "";
+        process_input(chat_input_string, player, chat_list, connection);
+        chat_input_string = "";
         current_activity = PLAY;
         send_chat_message = false;
         type_pos = 0;
@@ -870,7 +879,7 @@ void Setting::render() {
     render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(width / 2 - 10 - (dec_coords.size() * 7 - 3) * 2), float(height / 2 - 116)}, dec_coords, 2, 500);
 
     if(current_activity == CHAT) {
-        render_text_type(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(-width / 2 + 10), float(height / 2 - 34)}, char_callback_string.substr(type_start), 2, type_pos - type_start, width);
+        render_text_type(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(-width / 2 + 10), float(height / 2 - 34)}, chat_input_string.substr(type_start), 2, type_pos - type_start, width);
         
         glUseProgram(shader_map[4]);
         glUniform1f(0, 0.001f);

@@ -153,24 +153,23 @@ struct Entity {
         std::vector<tile_ID> tiles_stepped_on = get_tiles_under(loaded_chunks, {walk_box[0] + position[0], walk_box[1] + position[1], walk_box[2], walk_box[3]});
         if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) {
             texture_version = SWIMMING;
-            active_sprite[1] = direction_facing + 4;
             sprite_counter.set_limit(2);
+            active_sprite[1] = direction_facing + 4;
         } else {
             texture_version = WALKING;
-            active_sprite[1] = direction_facing;
             sprite_counter.set_limit(4);
+            active_sprite[1] = direction_facing;
         }
 
         switch(state) {
             case IDLE: {
+                cycle_timer.value = cycle_timer.limit - 1;
                 switch(texture_version) {
                     case WALKING: {
-                        cycle_timer.value = 0;
                         sprite_counter.value = 3;
                         break;
                     }
                     case SWIMMING: {
-                        cycle_timer.value = 0;
                         sprite_counter.value = 1;
                         break;
                     }
