@@ -274,7 +274,7 @@ int render_text(unsigned int shader, unsigned int source_img, std::array<int, 3>
     int lines = 1;
     bool hex_mode = false;
     std::array<float, 2> current_pos = lower_left;
-    std::array<float, 3> color = {0.0f, 0.0f, 0.0f};
+    std::array<float, 3> color = {1.0f, 1.0f, 1.0f};
     int str_size = str.size();
     for(int i = 0; i < str_size; ++i) {
         char c = str[i];
@@ -374,7 +374,7 @@ enum esc_seq_enum{NON, HEX, NLINE, DEC, COL1, COL2};
 void render_text_type(unsigned int shader, unsigned int source_img, std::array<int, 3> source_img_info, std::array<int, 2> window_size, std::array<float, 2> lower_left, std::string str, double text_scale, int type_pos, int screen_width) {
     bool hex_mode = false;
     std::array<float, 2> current_pos = lower_left;
-    std::array<float, 3> color = {0.0f, 0.0f, 0.0f};
+    std::array<float, 3> color = {1.0f, 1.0f, 1.0f};
     int esc_seq = 0;
     esc_seq_enum prev_esc_seq = NON;
     if(str.size() == 0) {
@@ -384,7 +384,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
         glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(12 * text_scale));
         glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
-        glUniform4f(11, 0.0f, 0.0f, 0.0f, 1.0f);
+        glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
@@ -473,7 +473,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                 glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(12 * text_scale));
                 glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
-                glUniform4f(11, 0.0f, 0.0f, 0.0f, 1.0f);
+                glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
 
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
@@ -507,7 +507,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                 glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(12 * text_scale));
                 glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
-                glUniform4f(11, 0.0f, 0.0f, 0.0f, 1.0f);
+                glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
 
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
@@ -525,7 +525,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
         glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(12 * text_scale));
         glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
-        glUniform4f(11, 0.0f, 0.0f, 0.0f, 1.0f);
+        glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
