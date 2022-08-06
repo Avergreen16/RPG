@@ -22,7 +22,7 @@ namespace netwk {
         tcp::socket socket;
         std::thread recieve_thread;
 
-        TCP_client(unsigned short int target_port);
+        TCP_client(uint16_t target_port);
 
         void receive_loop(Setting& setting, bool& game_running);
 

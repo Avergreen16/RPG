@@ -9,7 +9,8 @@ bool check_point_inclusion(std::array<type0, 4> intrect, std::array<type1, 2> po
     return false;
 }*/
 
-Player::Player(std::array<double, 2> position, uint texture_id, std::string name) {
+Player::Player(Setting* setting_ptr, std::array<double, 2> position, uint texture_id, std::string name) {
+    this->setting = setting_ptr;
     this->position = position;
     this->texture_id = texture_id;
     speed.target = 0.0;
@@ -21,6 +22,25 @@ void Player::render(int reference_y, std::array<double, 2> camera_pos, float sca
 }
 
 void Player::tick(uint delta) { // delta is in nanoseconds
+    std::vector<tile_ID> tiles_stepped_on = get_tiles_under(setting->loaded_chunks, {walk_box[0] + position[0], walk_box[1] + position[1], walk_box[2], walk_box[3]});
+    if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) {
+        texture_version = SWIMMING;
+        sprite_counter.set_limit(2);
+        if(state != IDLE)
+            state = SWIMMING;
+    } else if(setting->key_down_array[GLFW_KEY_SPACE]) {
+        texture_version = WALKING;
+        sprite_counter.set_limit(4);
+        if(state != IDLE)
+            state = RUNNING;
+    } else {
+        texture_version = WALKING;
+        sprite_counter.set_limit(4);
+        if(state != IDLE)
+            state = WALKING;
+    }
+    
+    
     double change_x = 0.0;
     double change_y = 0.0;
 
@@ -142,45 +162,66 @@ void Setting::process_input(std::string input, Player& player, std::list<text_st
         if(strcmp(input.substr(1, 4).data(), "tpm ") == 0) {
             std::string x = "";
             std::string y = "";
+            
+            int x_rad = 10;
+            int y_rad = 10;
+            bool x_digits = false;
+            bool y_digits = false;
+
             int pos = 5;
-            for(char c : input.substr(5)) {
-                pos++;
-                if(std::find(valid_numbers.begin(), valid_numbers.end(), c) == valid_numbers.end()) {
-                    break;
-                } else {
-                    x += c;
-                }
-            }
-            for(char c : input.substr(pos)) {
-                if(std::find(valid_numbers.begin(), valid_numbers.end(), c) == valid_numbers.end()) {
-                    break;
-                } else {
-                    y += c;
-                }
-            }
-            int x_val = strtoul(x.data(), nullptr, 10);
-            int y_val = strtoul(y.data(), nullptr, 10);
-            if(x_val < 0 || x_val >= world_size[0] || y_val < 0 || y_val >= world_size[1]) {
-                text_struct message;
-                message.set_values("Invalid parameters. (*tpm)", 600, 2);
-                message.generate_data();
-                chat_list.emplace_back(message);
-                total_chat_lines += message.lines;
-                if(chat_list.size() >= 25) {
-                    total_chat_lines -= chat_list.front().lines;
-                    chat_list.pop_front();
+            if(strcmp(input.substr(5, 2).data(), "\\x") == 0) {
+                x_rad = 16;
+                pos += 2;
+                for(char c : input.substr(pos)) {
+                    pos++;
+                    if(std::find(valid_hex_numbers.begin(), valid_hex_numbers.end(), c) == valid_hex_numbers.end()) {
+                        break;
+                    } else {
+                        x_digits = true;
+                        x += c;
+                    }
                 }
             } else {
-                player.position = {x_val + 0.5, y_val + 0.25};
-                text_struct message;
-                message.set_values("Teleported " + player.name.str + "\\c000 to coordinates: " + std::to_string(x_val) + " " + std::to_string(y_val), 600, 2);
-                message.generate_data();
-                chat_list.emplace_back(message);
-                total_chat_lines += message.lines;
-                if(chat_list.size() >= 25) {
-                    total_chat_lines -= chat_list.front().lines;
-                    chat_list.pop_front();
+                for(char c : input.substr(pos)) {
+                    pos++;
+                    if(std::find(valid_numbers.begin(), valid_numbers.end(), c) == valid_numbers.end()) {
+                        break;
+                    } else {
+                        x_digits = true;
+                        x += c;
+                    }
                 }
+            }
+            if(strcmp(input.substr(pos, 2).data(), "\\x") == 0) {
+                y_rad = 16;
+                pos += 2;
+                for(char c : input.substr(pos)) {
+                    if(std::find(valid_hex_numbers.begin(), valid_hex_numbers.end(), c) == valid_hex_numbers.end()) {
+                        break;
+                    } else {
+                        y_digits = true;
+                        y += c;
+                    }
+                }
+            } else {
+                for(char c : input.substr(pos)) {
+                    pos++;
+                    if(std::find(valid_numbers.begin(), valid_numbers.end(), c) == valid_numbers.end()) {
+                        break;
+                    } else {
+                        y_digits = true;
+                        y += c;
+                    }
+                }
+            }
+
+            int x_val = strtoul(x.data(), nullptr, x_rad);
+            int y_val = strtoul(y.data(), nullptr, y_rad);
+            if(x_val < 0 || x_val >= world_size[0] || y_val < 0 || y_val >= world_size[1] || !x_digits || !y_digits) {
+                insert_chat_message("Invalid parameters. (*tpm)");
+            } else {
+                player.position = {x_val + 0.5, y_val + 0.25};
+                insert_chat_message("Teleported " + player.name.str + "\\cfff to coordinates: " + std::to_string(x_val) + " " + std::to_string(y_val));
             }
         } else {
             text_struct message;
@@ -245,77 +286,48 @@ std::array<int, 2> Setting::get_player_current_chunk() {
     return {int(player.position[0] / 16), int(player.position[1] / 16)};
 }
 
-void Setting::set_player_enums(directions dir_moving, directions dir_facing) {
+void Setting::update_movement(directions dir_moving, directions dir_facing) {
     player.direction_moving = dir_moving;
     player.direction_facing = dir_facing;
     player.keep_moving = true;
 
-    std::vector<tile_ID> tiles_stepped_on = get_tiles_under(loaded_chunks, {player.walk_box[0] + player.position[0], player.walk_box[1] + player.position[1], player.walk_box[2], player.walk_box[3]});
-    if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) {
-        player.texture_version = SWIMMING;
-        player.sprite_counter.set_limit(2);
-        player.state = SWIMMING;
-    } else if(key_down_array[GLFW_KEY_SPACE]) {
-        player.texture_version = WALKING;
-        player.sprite_counter.set_limit(4);
-        player.state = RUNNING;
-    } else {
-        player.texture_version = WALKING;
-        player.sprite_counter.set_limit(4);
-        player.state = WALKING;
-    }
+    player.state = WALKING;
 }
 
-void Setting::set_player_enums() {
+void Setting::update_movement() {
     player.keep_moving = false;
 
     if(player.speed.value == 0.0) 
         player.state = IDLE;
-    else {
-        std::vector<tile_ID> tiles_stepped_on = get_tiles_under(loaded_chunks, {player.walk_box[0] + player.position[0], player.walk_box[1] + player.position[1], player.walk_box[2], player.walk_box[3]});
-        if(std::count(tiles_stepped_on.begin(), tiles_stepped_on.end(), WATER) == tiles_stepped_on.size()) {
-            player.texture_version = SWIMMING;
-            player.sprite_counter.set_limit(2);
-            player.state = SWIMMING;
-        } else if(key_down_array[GLFW_KEY_SPACE]) {
-            player.texture_version = WALKING;
-            player.sprite_counter.set_limit(4);
-            player.state = RUNNING;
-        } else {
-            player.texture_version = WALKING;
-            player.sprite_counter.set_limit(4);
-            player.state = WALKING;
-        }
-    }
 }
 
 void Setting::process_key_inputs() {
     bool check_last_key_pressed = true;
     if(key_down_array[GLFW_KEY_W]) {
         if(key_down_array[GLFW_KEY_D]) 
-            set_player_enums(NORTHEAST, EAST);
+            update_movement(NORTHEAST, EAST);
         else if(key_down_array[GLFW_KEY_S]) 
-            set_player_enums();
+            update_movement();
         else if(key_down_array[GLFW_KEY_A]) 
-            set_player_enums(NORTHWEST, WEST);
+            update_movement(NORTHWEST, WEST);
         else
-            set_player_enums(NORTH, NORTH);
+            update_movement(NORTH, NORTH);
     } else if(key_down_array[GLFW_KEY_D]) {
         if(key_down_array[GLFW_KEY_S])
-            set_player_enums(SOUTHEAST, EAST);
+            update_movement(SOUTHEAST, EAST);
         else if(key_down_array[GLFW_KEY_A])
-            set_player_enums();
+            update_movement();
         else
-            set_player_enums(EAST, EAST);
+            update_movement(EAST, EAST);
     } else if(key_down_array[GLFW_KEY_S]) {
         if(key_down_array[GLFW_KEY_A])
-            set_player_enums(SOUTHWEST, WEST);
+            update_movement(SOUTHWEST, WEST);
         else
-            set_player_enums(SOUTH, SOUTH);
+            update_movement(SOUTH, SOUTH);
     } else if(key_down_array[GLFW_KEY_A])
-        set_player_enums(WEST, WEST);
+        update_movement(WEST, WEST);
     else
-        set_player_enums();
+        update_movement();
 }
 
 void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -453,7 +465,7 @@ void Setting::char_callback(GLFWwindow* window, uint codepoint) {
 Setting::Setting(GLFWwindow* window, netwk::TCP_client& connection_ref, std::array<double, 2> player_start_pos, std::string name) : connection(connection_ref) {
     load_textures_into_map();
     create_shaders();
-    player = Player(player_start_pos, texture_map[2].id, name);
+    player = Player(this, player_start_pos, texture_map[2].id, name);
     version.generate_data();
     this->window = window;
 }

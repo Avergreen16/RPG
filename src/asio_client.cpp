@@ -12,7 +12,7 @@ namespace netwk {
     void TCP_client::receive_loop(Setting& setting, bool& game_running) { // recieves incoming packets and does things with them based on header contents
         if(!game_running) socket.close();
         else {
-            std::shared_ptr<std::array<char, sizeof(packet_header)>> buffer(new std::array<char, sizeof(packet_header)>);
+            std::shared_ptr<std::array<uint8_t, sizeof(packet_header)>> buffer(new std::array<uint8_t, sizeof(packet_header)>);
             socket.async_read_some(asio::buffer(buffer->data(), buffer->size()),
                 [this, buffer, &setting, &game_running](const asio::error_code& error_code, size_t bytes_transferred) {
                     if(error_code) {
@@ -58,8 +58,16 @@ namespace netwk {
 
                                             break;
                                         }
-                                        case 3: {
-                                            
+                                        case 3: { // chunk data and key
+                                            std::vector<std::pair<uint, Chunk_data>> chunk_vector(bytes_transferred / sizeof(std::pair<uint, Chunk_data>));
+                                            memcpy(chunk_vector.data(), buffer_body->data(), bytes_transferred);
+
+                                            for(std::pair<uint, Chunk_data> chunk_key_pair : chunk_vector) {
+                                                setting.loaded_chunks.insert(chunk_key_pair);
+                                                update_chunk_water(setting.loaded_chunks, world_size_chunks, chunk_key_pair.first);
+                                            }
+
+                                            break;
                                         }
                                         default: { // the packet recieved did not have a valid header type if it reaches the default statement
                                             std::cout << "Recieved a packet with an invalid header type.\n";

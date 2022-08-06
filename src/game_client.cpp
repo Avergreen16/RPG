@@ -6,26 +6,29 @@
 const uint pos_send_per_sec = 45;
 const uint pos_send_mil = 1000000000 / pos_send_per_sec;
 
-void chunk_gen_thread(bool& game_running, Setting& setting, Worldgen& worldgen) {
+void chunk_gen_thread(bool& game_running, Setting& setting) {
     while(game_running) {
         if(setting.check_if_moved_chunk()) {
-            std::vector<uint> update_chunk_queue;
+            //std::vector<uint> update_chunk_queue;
             std::array<uint, total_loaded_chunks> new_active_chunk_keys;
             std::array<int, 2> current_chunk_pos = {setting.current_chunk % world_size_chunks[0], setting.current_chunk / world_size_chunks[0]};
+            std::vector<uint> chunk_requests;
             for(int x = 0; x <= chunk_load_x * 2; ++x) {
                 for(int y = 0; y <= chunk_load_y * 2; ++y) {
                     uint chunk_key = setting.current_chunk + (x - chunk_load_x) + world_size_chunks[0] * (y - chunk_load_y);
-                    if(insert_chunk(setting.loaded_chunks, world_size_chunks, chunk_key, worldgen)) {
+                    /*if(insert_chunk(setting.loaded_chunks, world_size_chunks, chunk_key, worldgen)) {
                         update_chunk_queue.push_back(chunk_key);
+                    }*/
+                    if(!setting.loaded_chunks.contains(chunk_key)) {
+                        chunk_requests.push_back(chunk_key);
                     }
                     new_active_chunk_keys[x + y * (chunk_load_x * 2 + 1)] = chunk_key;
                 }
             }
-
-            for(uint chunk_key : update_chunk_queue) {
-                update_chunk_water(setting.loaded_chunks, world_size_chunks, chunk_key);
+            if(chunk_requests.size() != 0) {
+                std::vector<uint8_t> chunk_request_packet = netwk::make_packet(3, (void*)chunk_requests.data(), chunk_requests.size() * sizeof(uint));
+                setting.connection.send(chunk_request_packet);
             }
-            update_chunk_queue.clear();
 
             setting.active_chunk_keys = new_active_chunk_keys;
         }
@@ -34,7 +37,6 @@ void chunk_gen_thread(bool& game_running, Setting& setting, Worldgen& worldgen) 
 
 int main() {
     netwk::TCP_client connection(0xa50e);
-    time_t time_storage_frames = clock();
 
     if(!glfwInit()) {
         std::cout << "glfw failure (init)\n";
@@ -75,22 +77,18 @@ int main() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-
     Setting setting(window, connection, {23460.5, 10378.5}, player_name);
     glfwSetWindowUserPointer(window, &setting);
     glfwSetKeyCallback(window, Setting::key_callback);
     glfwSetCharCallback(window, Setting::char_callback);
     glfwSetScrollCallback(window, Setting::scroll_callback);
 
-    Worldgen worldgen;
-    worldgen.construct_3(0.7707326, 6, 3, 7, 1.5, 4, 4, 3, 1.5, 4, 4, 4, 1.3);
-
 
     bool game_running = true;
 
     std::thread chunk_thread(
-        [&game_running, &worldgen, &setting]() {
-            chunk_gen_thread(game_running, setting, worldgen);
+        [&game_running, &setting]() {
+            chunk_gen_thread(game_running, setting);
         }
     );
 

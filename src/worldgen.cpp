@@ -170,7 +170,7 @@ struct Worldgen {
     PerlinNoiseFactory pfac3;
     RNG rng;
 
-    void construct_3(double seed, int width1, int height1, int octaves1, double persistance1, int width2, int height2, int octaves2, double persistance2, int width3, int height3, int octaves3, double persistance3) {
+    Worldgen(double seed, int width1, int height1, int octaves1, double persistance1, int width2, int height2, int octaves2, double persistance2, int width3, int height3, int octaves3, double persistance3) {
         pfac1.set_parameters(seed, seed * 45.18754874623, width1, height1, octaves1, persistance1, 0.15, 0.5, true, false);
         pfac2.set_parameters(seed, seed * 21.1324254354, width2, height2, octaves2, persistance2, 0.2, 0.5, true, false);
         pfac3.set_parameters(seed, seed * 57.62634832648, width3, height3, octaves3, persistance3, 0.15, 0.5, true, false);

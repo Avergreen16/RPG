@@ -12,6 +12,7 @@
 
 #include "asio_packets.cpp"
 #include "pathfinding.cpp"
+#include "worldgen.cpp"
 
 const uint max_sends_per_sec = 20;
 const uint max_ticks_per_sec = 100;
@@ -178,6 +179,7 @@ namespace netwk {
     struct TCP_server;
 
     struct TCP_connection {
+        TCP_server* parent_server;
         tcp::socket socket;
 
         std::string message = "This is client ";
@@ -187,15 +189,17 @@ namespace netwk {
         std::string player_name;
         std::thread send_loop_thread;
 
-        TCP_connection(asio::io_context& io_context, uint client_id);
+        TCP_connection(asio::io_context& io_context, uint client_id, TCP_server* parent_server);
 
-        void start(TCP_server& parent_server);
+        void start();
 
-        void recieve_loop(TCP_server& parent_server);
+        void recieve_loop();
         
         void send_loop();
 
-        static std::shared_ptr<TCP_connection> create(asio::io_context& io_context, uint client_id);
+        void send(std::vector<uint8_t> packet);
+
+        static std::shared_ptr<TCP_connection> create(asio::io_context& io_context, uint client_id, TCP_server* parent_server);
     };
 
     struct connection_thread {
@@ -204,6 +208,8 @@ namespace netwk {
     };
 
     struct TCP_server {
+        std::unordered_map<uint, Chunk_data> loaded_chunks;
+
         uint total_connections = 0;
         uint connection_id_counter = 0;
 
@@ -211,6 +217,9 @@ namespace netwk {
         asio::io_context io_context;
         tcp::acceptor acceptor;
         std::unordered_map<uint, connection_thread> connection_map;
+
+        std::queue<std::pair<uint, uint>> chunk_requests;
+        std::thread chunk_gen_thread;
 
         TCP_server(uint16_t port);
 
@@ -223,13 +232,14 @@ namespace netwk {
         void broadcast(uint id, std::vector<uint8_t> body, uint origin_client);
     };
 
-    TCP_connection::TCP_connection(asio::io_context& io_context, uint client_id) : socket(io_context) {
+    TCP_connection::TCP_connection(asio::io_context& io_context, uint client_id, TCP_server* parent_server) : socket(io_context) {
+        this->parent_server = parent_server;
         message += std::to_string(client_id) + "\n";
         this->client_id = client_id;
     }
 
-    void TCP_connection::start(TCP_server& parent_server) {
-        recieve_loop(parent_server);
+    void TCP_connection::start() {
+        recieve_loop();
         send_loop();
         while(true) {
             if(break_connection) {
@@ -239,23 +249,23 @@ namespace netwk {
         }
     }
 
-    void TCP_connection::recieve_loop(TCP_server& parent_server) {
+    void TCP_connection::recieve_loop() {
         std::shared_ptr<std::array<char, sizeof(packet_header)>> buffer(new std::array<char, sizeof(packet_header)>);
         socket.async_read_some(asio::buffer(buffer->data(), buffer->size()),
-            [this, buffer, &parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
+            [this, buffer](const asio::error_code& error_code, size_t bytes_transferred) {
                 if(error_code == asio::error::eof) {
                     std::cout << "Client " + std::to_string(client_id) + " disconnected (no error).\n";
                     std::string message = this->player_name + " \\cfffquit the game.";
                     std::vector<uint8_t> body(message.size());
                     memcpy(body.data(), message.data(), message.size());
-                    parent_server.broadcast(0, body, this->client_id);
+                    parent_server->broadcast(0, body, this->client_id);
                     break_connection = true;
                 } else if(error_code) {
                     std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
                     std::string message = this->player_name + " \\cfffquit the game.";
                     std::vector<uint8_t> body(message.size());
                     memcpy(body.data(), message.data(), message.size());
-                    parent_server.broadcast(0, body, this->client_id);
+                    parent_server->broadcast(0, body, this->client_id);
                     break_connection = true;
                 } else {
                     packet_header header;
@@ -263,18 +273,19 @@ namespace netwk {
 
                     std::shared_ptr<std::vector<uint8_t>> buffer_body(new std::vector<uint8_t>(header.size_bytes));
                     this->socket.async_read_some(asio::buffer(buffer_body->data(), buffer_body->size()), 
-                        [this, header_id = header.id, buffer_body, &parent_server](const asio::error_code& error_code, size_t bytes_transferred) {
+                        [this, header_id = header.id, buffer_body](const asio::error_code& error_code, size_t bytes_transferred) {
                             if(error_code) { // if there is an error, disconnect player and tell other clients
                                 std::cout << "Client " + std::to_string(client_id) + " disconnected, error: " << error_code.message() << "\n";
 
                                 std::string message = this->player_name + " \\cfffquit the game.";
                                 std::vector<uint8_t> body(message.size());
                                 memcpy(body.data(), message.data(), message.size());
-                                parent_server.broadcast(0, body, this->client_id);
+                                parent_server->broadcast(0, body, this->client_id);
 
                                 break_connection = true;
                             } else { // if there isn't an error, do things with the recieved data depending on what the header's id is
-                                recieve_loop(parent_server); // primes next recieve, this does NOT stall the program waiting for data to be recieved
+                                recieve_loop(); // primes next recieve, this does NOT stall the program waiting for data to be recieved
+
                                 switch(header_id) {
                                     case 0: { // player logged in
                                         std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ". (player logged in)\n";
@@ -286,12 +297,12 @@ namespace netwk {
 
                                         player_join_packet_toclient send_packet{recv_packet.name, {this->associated_entity_id, recv_packet.entity_packet.position, recv_packet.entity_packet.direction}};
                                         std::vector<uint8_t> join_packet_body = to_byte_vector(send_packet);
-                                        parent_server.broadcast(1, join_packet_body, this->client_id);
+                                        parent_server->broadcast(1, join_packet_body, this->client_id);
 
                                         std::string message = this->player_name + " \\cfffjoined the game.";
                                         std::vector<uint8_t> body(message.size());
                                         memcpy(body.data(), message.data(), message.size());
-                                        parent_server.broadcast(0, body);
+                                        parent_server->broadcast(0, body);
                                         break;
                                     }
                                     case 1: { // chat message
@@ -299,7 +310,7 @@ namespace netwk {
                                         std::string message = this->player_name + " \\cfff: " + make_string(reinterpret_cast<char*>(buffer_body->data()), bytes_transferred);
                                         std::vector<uint8_t> body(message.size());
                                         memcpy(body.data(), message.data(), message.size());
-                                        parent_server.broadcast(0, body);
+                                        parent_server->broadcast(0, body);
                                         break;
                                     }
                                     case 2: { // player position
@@ -309,8 +320,19 @@ namespace netwk {
                                         entity_map[this->associated_entity_id].direction_facing = recv_packet.direction;
                                         break;
                                     }
+                                    case 3: { // chunk request
+                                        std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ". (chunk request)\n";
+                                        std::vector<uint> request_vector(bytes_transferred / sizeof(uint));
+                                        memcpy(request_vector.data(), buffer_body->data(), bytes_transferred);
+
+                                        for(uint chunk_key : request_vector) {
+                                            parent_server->chunk_requests.push({client_id, chunk_key});
+                                        }
+
+                                        break;
+                                    }
                                     default: { // the header on the packet didn't match any header id
-                                        std::cout << "Recieved a packet with an invalid header type from client " + std::to_string(this->client_id) + "\n";
+                                        std::cout << "Recieved a packet with an invalid header type from client " + std::to_string(this->client_id) + ": " << header_id << "\n";
                                     }
                                 }
                             }
@@ -333,27 +355,13 @@ namespace netwk {
                         for(auto& [id, entity] : entity_map) {
                             if(id != this->associated_entity_id) {
                                 entity_movement_packet_toclient entity_packet{id, entity.position, entity.direction_facing};
-                                std::vector<uint8_t> send_vector = make_packet(2, (void*)&entity_packet, sizeof(entity_packet));
-                                this->socket.async_send(asio::buffer(send_vector.data(), send_vector.size()), 
-                                    [this](const asio::error_code& error_code, size_t bytes_transferred) {
-                                        if(error_code) {
-                                            std::cout << "Failed to send message to client " << this->client_id << ", error: " << error_code.message() << "\n";
-                                        }
-                                    }
-                                );
+                                send(make_packet(2, (void*)&entity_packet, sizeof(entity_packet)));
                             }
                         }
 
                         for(auto& [id, enemy] : enemy_map) {
                             entity_movement_packet_toclient entity_packet{id, enemy.position, enemy.direction_facing};
-                            std::vector<uint8_t> send_vector = make_packet(2, (void*)&entity_packet, sizeof(entity_packet));
-                            this->socket.async_send(asio::buffer(send_vector.data(), send_vector.size()), 
-                                [this](const asio::error_code& error_code, size_t bytes_transferred) {
-                                    if(error_code) {
-                                        std::cout << "Failed to send message to client " << this->client_id << ", error: " << error_code.message() << "\n";
-                                    }
-                                }
-                            );
+                            send(make_packet(2, (void*)&entity_packet, sizeof(entity_packet)));
                         }
                     }
                 }
@@ -361,17 +369,46 @@ namespace netwk {
         );
     }
 
-    std::shared_ptr<TCP_connection> TCP_connection::create(asio::io_context& io_context, uint client_id) {
-        return std::shared_ptr<TCP_connection>(new TCP_connection(io_context, client_id));
+    void TCP_connection::send(std::vector<uint8_t> packet) {
+        this->socket.async_send(asio::buffer(packet.data(), packet.size()), 
+            [this](const asio::error_code& error_code, size_t bytes_transferred) {
+                if(error_code) {
+                    std::cout << "Failed to send message to client " << this->client_id << ", error: " << error_code.message() << "\n";
+                }
+            }
+        );
+    }
+
+    std::shared_ptr<TCP_connection> TCP_connection::create(asio::io_context& io_context, uint client_id, TCP_server* parent_server) {
+        return std::shared_ptr<TCP_connection>(new TCP_connection(io_context, client_id, parent_server));
     }
 
     TCP_server::TCP_server(uint16_t port) : acceptor(io_context, tcp::endpoint(tcp::v4(), port)) {
         this->port = port;
+
+        chunk_gen_thread = std::thread(
+            [this]() {
+                Worldgen worldgen(0.7707326, 6, 3, 7, 1.5, 4, 4, 3, 1.5, 4, 4, 4, 1.3);
+
+                while(true) {
+                    if(chunk_requests.size() != 0) {
+                        std::pair<uint, uint> client_id_chunk_key = chunk_requests.front();
+                        chunk_requests.pop();
+                        if(!loaded_chunks.contains(client_id_chunk_key.second)) {
+                            insert_chunk(loaded_chunks, world_size_chunks, client_id_chunk_key.second, worldgen);
+                        }
+
+                        std::pair<uint, Chunk_data> key_data_pair = {client_id_chunk_key.second, loaded_chunks[client_id_chunk_key.second]};
+                        connection_map[client_id_chunk_key.first].connection->send(make_packet(3, &key_data_pair, sizeof(key_data_pair)));
+                    }
+                }
+            }
+        );
     }
 
     void TCP_server::start_accept() {
         // create connection
-        auto connection = TCP_connection::create(io_context, connection_id_counter);
+        auto connection = TCP_connection::create(io_context, connection_id_counter, this);
         
 
         // asynchronously accept connection
@@ -381,7 +418,7 @@ namespace netwk {
                     std::cout << "Connection " + std::to_string(connection_id_counter) + " accepted.\n";
                     this->connection_map.insert({connection_id_counter, connection_thread{connection, std::thread(
                         [this, connection]() {
-                            connection->start(*this);
+                            connection->start();
                         }
                     )}});
                     ++total_connections;

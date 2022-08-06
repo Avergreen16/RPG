@@ -21,6 +21,7 @@
 namespace netwk {
     struct TCP_client;
 }
+struct Setting;
 
 const uint chunk_load_x = 2;
 const uint chunk_load_y = 2;
@@ -50,6 +51,7 @@ struct Approach {
 };
 
 struct Player {
+    Setting* setting;
     uint texture_id;
 
     std::array<float, 2> visual_size = {2, 2};
@@ -72,7 +74,7 @@ struct Player {
     text_struct name;
 
     Player() = default;
-    Player(std::array<double, 2> position, uint texture_id, std::string name);
+    Player(Setting* setting_ptr, std::array<double, 2> position, uint texture_id, std::string name);
     
     void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size);
 
@@ -169,9 +171,9 @@ struct Setting {
 
     std::array<int, 2> get_player_current_chunk();
 
-    void set_player_enums(directions dir_moving, directions dir_facing);
+    void update_movement(directions dir_moving, directions dir_facing);
 
-    void set_player_enums();
+    void update_movement();
 
     void process_key_inputs();
 

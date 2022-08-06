@@ -148,6 +148,7 @@ std::unordered_map<char, int> hex_to_dec = {
 };
 
 std::array<char, 10> valid_numbers = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+std::array<char, 16> valid_hex_numbers = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
 int get_string_length(std::string str, int text_scale) {
     int collector = -1;
