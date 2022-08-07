@@ -13,7 +13,8 @@ Player::Player(Setting* setting_ptr, std::array<double, 2> position, uint textur
     this->setting = setting_ptr;
     this->position = position;
     this->texture_id = texture_id;
-    speed.target = 0.0;
+    velocity[0].target = 0.0;
+    velocity[1].target = 0.0;
     this->name.set_values(name, 0x10000, 1);
 }
 
@@ -47,32 +48,32 @@ void Player::tick(uint delta) { // delta is in nanoseconds
     if(state != IDLE) {
         switch(direction_moving) {
             case NORTH:
-                change_y = 0.000000006 * delta;
+                change_y = 1.0;
                 break;
             case NORTHEAST:
-                change_x = 0.000000004243 * delta;
-                change_y = 0.000000004243 * delta;
+                change_x = SQRT1_2;
+                change_y = SQRT1_2;
                 break;
             case EAST:
-                change_x = 0.000000006 * delta;
+                change_x = 1.0;
                 break;
             case SOUTHEAST:
-                change_x = 0.000000004243 * delta;
-                change_y = -0.000000004243 * delta;
+                change_x = SQRT1_2;
+                change_y = -SQRT1_2;
                 break;
             case SOUTH:
-                change_y = -0.000000006 * delta;
+                change_y = -1.0;
                 break;
             case SOUTHWEST:
-                change_x = -0.000000004243 * delta;
-                change_y = -0.000000004243 * delta;
+                change_x = -SQRT1_2;
+                change_y = -SQRT1_2;
                 break;
             case WEST:
-                change_x = -0.000000006 * delta;
+                change_x = -1.0;
                 break;
             case NORTHWEST:
-                change_x = -0.000000004243 * delta;
-                change_y = 0.000000004243 * delta;
+                change_x = -SQRT1_2;
+                change_y = SQRT1_2;
                 break;
         }
     }
@@ -87,52 +88,64 @@ void Player::tick(uint delta) { // delta is in nanoseconds
         case WALKING: {
             active_sprite[1] = direction_facing;
             if(keep_moving) {
-                speed.target = 1.0;
-                speed.modify(0.00000001 * delta);
+                velocity[0].target = change_x;
+                velocity[1].target = change_y;
+                velocity[0].modify(0.000000005 * delta);
+                velocity[1].modify(0.000000005 * delta);
             } else {
-                speed.target = 0.0;
-                speed.modify(0.00000002 * delta);
+                velocity[0].target = 0.0;
+                velocity[1].target = 0.0;
+                velocity[0].modify(0.00000001 * delta);
+                velocity[1].modify(0.00000001 * delta);
             }
             if(cycle_timer.increment_by(delta)) {
                 sprite_counter.increment();
             }
             
-            position[0] += change_x * speed.value;
-            position[1] += change_y * speed.value;
+            position[0] += 0.000000006 * delta * velocity[0].value;
+            position[1] += 0.000000006 * delta * velocity[1].value;
             break;
         }
         case RUNNING: {
             active_sprite[1] = direction_facing;
             if(keep_moving) {
-                speed.target = 1.6;
-                speed.modify(0.00000001 * delta);
+                velocity[0].target = change_x;
+                velocity[1].target = change_y;
+                velocity[0].modify(0.000000005 * delta);
+                velocity[1].modify(0.000000005 * delta);
             } else {
-                speed.target = 0.0;
-                speed.modify(0.00000002 * delta);
+                velocity[0].target = 0.0;
+                velocity[1].target = 0.0;
+                velocity[0].modify(0.00000001 * delta);
+                velocity[1].modify(0.00000001 * delta);
             }
             if(cycle_timer.increment_by(delta * 1.3)) {
                 sprite_counter.increment();
             }
-
-            position[0] += change_x * speed.value;
-            position[1] += change_y * speed.value;
+            
+            position[0] += 0.00000001 * delta * velocity[0].value;
+            position[1] += 0.00000001 * delta * velocity[1].value;
             break;
         }
         case SWIMMING: {
             active_sprite[1] = direction_facing + 4;
             if(keep_moving) {
-                speed.target = 0.5;
-                speed.modify(0.000000005 * delta, 0.00000004 * delta);
+                velocity[0].target = change_x;
+                velocity[1].target = change_y;
+                velocity[0].modify(0.000000005 * delta);
+                velocity[1].modify(0.000000005 * delta);
             } else {
-                speed.target = 0.0;
-                speed.modify(0.00000004 * delta);
+                velocity[0].target = 0.0;
+                velocity[1].target = 0.0;
+                velocity[0].modify(0.00000001 * delta);
+                velocity[1].modify(0.00000001 * delta);
             }
             if(cycle_timer.increment_by(delta * 0.6)) {
                 sprite_counter.increment();
             }
-
-            position[0] += change_x * speed.value;
-            position[1] += change_y * speed.value;
+            
+            position[0] += 0.000000003 * delta * velocity[0].value;
+            position[1] += 0.000000003 * delta * velocity[1].value;
             break;
         }
     }
@@ -297,7 +310,7 @@ void Setting::update_movement(directions dir_moving, directions dir_facing) {
 void Setting::update_movement() {
     player.keep_moving = false;
 
-    if(player.speed.value == 0.0) 
+    if(player.velocity[0].value == 0.0 && player.velocity[1].value == 0.0) 
         player.state = IDLE;
 }
 

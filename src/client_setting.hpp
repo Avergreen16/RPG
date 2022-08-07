@@ -54,16 +54,17 @@ struct Player {
     Setting* setting;
     uint texture_id;
 
+    std::array<double, 2> position;
+    std::array<Approach, 2> velocity;
+
     std::array<float, 2> visual_size = {2, 2};
     std::array<float, 2> visual_offset = {-1, -0.125};
-    std::array<double, 2> position;
     std::array<int, 2> sprite_size = {32, 32};
     std::array<int, 2> active_sprite = {3, 2};
     std::array<double, 4> walk_box = {-0.375, -0.125, 0.75, 0.25};
 
     Counter cycle_timer = {0, 150000000};
     Counter sprite_counter = {3, 4};
-    Approach speed;
 
     states state = IDLE;
     states texture_version = WALKING;
