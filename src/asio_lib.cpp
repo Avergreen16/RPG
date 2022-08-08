@@ -52,6 +52,8 @@ namespace netwk {
         directions direction_moving = SOUTH;
         directions direction_facing = SOUTH;
 
+        directions prev_dir = OUT_OF_RANGE;
+
         bool target_aquired = false;
         bool pathfind_bool = true;
 
@@ -69,7 +71,10 @@ namespace netwk {
                 if(pathfind_bool) {
                     directions dir = OUT_OF_RANGE;
                     if(entity_map.contains(target_id)) {
-                        dir = Astar_pathfinding({7, 7}, {int(entity_map[target_id].position[0] - position[0]) + 7, int(entity_map[target_id].position[1] - position[1]) + 7}, empty_9x9_array);
+                        bool favor_diagonals = false;
+                        if(prev_dir == NORTHEAST || prev_dir == SOUTHEAST || prev_dir == SOUTHWEST || prev_dir == NORTHWEST) favor_diagonals = true;
+                        dir = Astar_pathfinding({7, 7}, {int(entity_map[target_id].position[0] - position[0]) + 7, int(entity_map[target_id].position[1] - position[1]) + 7}, empty_9x9_array, favor_diagonals);
+                        prev_dir = dir;
                     }
                     if(!(dir == NONE || dir == OUT_OF_RANGE)) {
                         target_aquired = true;
@@ -218,7 +223,7 @@ namespace netwk {
         tcp::acceptor acceptor;
         std::unordered_map<uint, connection_thread> connection_map;
 
-        std::queue<std::pair<uint, uint>> chunk_requests;
+        std::queue<std::pair<uint, std::vector<uint>>> chunk_requests;
         std::thread chunk_gen_thread;
 
         TCP_server(uint16_t port);
@@ -325,9 +330,7 @@ namespace netwk {
                                         std::vector<uint> request_vector(bytes_transferred / sizeof(uint));
                                         memcpy(request_vector.data(), buffer_body->data(), bytes_transferred);
 
-                                        for(uint chunk_key : request_vector) {
-                                            parent_server->chunk_requests.push({client_id, chunk_key});
-                                        }
+                                        parent_server->chunk_requests.push({client_id, request_vector});
 
                                         break;
                                     }
@@ -392,14 +395,28 @@ namespace netwk {
 
                 while(true) {
                     if(chunk_requests.size() != 0) {
-                        std::pair<uint, uint> client_id_chunk_key = chunk_requests.front();
+                        std::pair<uint, std::vector<uint>> client_id_chunk_req = chunk_requests.front();
                         chunk_requests.pop();
-                        if(!loaded_chunks.contains(client_id_chunk_key.second)) {
-                            insert_chunk(loaded_chunks, world_size_chunks, client_id_chunk_key.second, worldgen);
+
+                        std::vector<std::pair<uint, Chunk_data>> send_vector;
+
+                        for(uint chunk_key : client_id_chunk_req.second) {
+                            if(!loaded_chunks.contains(chunk_key)) {
+                                insert_chunk(loaded_chunks, world_size_chunks, chunk_key, worldgen);
+                            }
+
+                            send_vector.push_back({chunk_key, loaded_chunks[chunk_key]});
+                            if(send_vector.size() >= 8) {
+                                connection_map[client_id_chunk_req.first].connection->send(make_packet(3, (void*)send_vector.data(), send_vector.size() * sizeof(std::pair<uint, Chunk_data>)));
+                                send_vector.clear();
+                            }
+                            /*std::pair<uint, Chunk_data> key_chunk_pair = {chunk_key, loaded_chunks[chunk_key]};
+                            connection_map[client_id_chunk_req.first].connection->send(make_packet(3, (void*)&key_chunk_pair, sizeof(std::pair<uint, Chunk_data>)));*/
                         }
 
-                        std::pair<uint, Chunk_data> key_data_pair = {client_id_chunk_key.second, loaded_chunks[client_id_chunk_key.second]};
-                        connection_map[client_id_chunk_key.first].connection->send(make_packet(3, &key_data_pair, sizeof(key_data_pair)));
+                        if(send_vector.size() != 0) {
+                            connection_map[client_id_chunk_req.first].connection->send(make_packet(3, (void*)send_vector.data(), send_vector.size() * sizeof(std::pair<uint, Chunk_data>)));
+                        }
                     }
                 }
             }

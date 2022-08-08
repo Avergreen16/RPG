@@ -1,6 +1,9 @@
 #define _USE_MATH_DEFINES
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#define GLFW_INCLUDE_NONE
+#include <glfw\glfw3.h>
+#include <glad\glad.h>
 
 #include <cmath>
 #include <iostream>
@@ -86,131 +89,34 @@ struct Mapgen {
     }
 };
 
+const char* compute_shader_source = R"""(
+#version 460 core;
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D screen;
+
+void main() {
+    
+}
+)""";
+
 int main() {
-    //sf::Clock clock;
-    stbi_flip_vertically_on_write(true);
-    RNG rng;
+    const uint width = 1024, height = 512;
 
-    double seed;
-    int w, h, type, count = 1;
-    double p, f;
-    int num_craters = 0, min_rad, max_rad;
-    double drop_off_start, drop_off_end;
-    std::string source_filepath;
-    std::string input_filepath;
-
-    std::cout << "seed (number between 0 and 1): ";
-    std::cin >> seed;
-    std::cout << "image width: ";
-    std::cin >> w;
-    std::cout << "image height: ";
-    std::cin >> h;
-    std::cout << "map type: ";
-    std::cin >> type;
-    if(type == 1) {
-        std::cout << "persistance value: ";
-        std::cin >> p;
-    } else if(type == 2) {
-        std::cout << "persistance value: ";
-        std::cin >> p;
-        std::cout << "factor value: ";
-        std::cin >> f;
-        std::cout << "number of maps: ";
-        std::cin >> count;
-        std::cout << "number of craters: ";
-        std::cin >> num_craters;
-        std::cout << "min crater radius: ";
-        std::cin >> min_rad;
-        std::cout << "max crater radius: ";
-        std::cin >> max_rad;
-        if(count != 1) rng = {seed, 76.9812749};
-    } else if(type == 3) {
-        std::cout << "value drop off start: ";
-        std::cin >> drop_off_start;
-        std::cout << "value drop off end: ";
-        std::cin >> drop_off_end;
+    if(!glfwInit()) {
+        std::cout << "glfw failure (init)\n";
+        return 1;
     }
-    std::cout << "source image filepath/file name: ";
-    std::cin >> source_filepath;
-    std::cout << "filepath/file name to save: ";
-    std::cin >> input_filepath;
+    gladLoadGL();
 
-    Mapgen mgen;
-    if(type == 0) {
-        mgen.construct_3(seed, 6, 3, 7, 1.5, 4, 4, 3, 1.5, 4, 4, 4, 1.3);
-    } else if(type == 1) {
-        mgen.construct_1(seed, 4, 4, 3, p);
-        stbi_set_flip_vertically_on_load(true);
-    } else if(type == 2) {
-        mgen.construct_1(seed, 4, 4, 3, p);
-    } else if(type == 3) {
-        mgen.construct_1(seed, 4, 4, 3, 1.5);
-    }
+    uint compute_shader = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(compute_shader, 1, &compute_shader_source, NULL);
+    glCompileShader(compute_shader);
 
+    uint compute_program = glCreateProgram();
+    glAttachShader(compute_program, compute_shader);
+    glLinkProgram(compute_program);
 
-
-    for(int t = 0; t < count; t++) {
-        clock_t time_start = clock();
-        int width, height, n_channels;
-        unsigned char* source_img = stbi_load(source_filepath.c_str(), &width, &height, &n_channels, 4);
-        std::string filepath;
-        if(num_craters != 0) mgen.generate_craters(num_craters, {w, h}, min_rad, max_rad);
-        if(count != 1) {
-            if(t != 0) data.clear();
-            if(type == 2) {
-                mgen.construct_1(rng(), 4, 4, 3, p);
-                filepath = input_filepath + std::to_string(t) + ".png";
-            }
-        } else {
-            filepath = input_filepath;
-        }
-        
-        if(type == 0) {
-            for(int y = 0; y < h; y++) {
-                for(int x = 0; x < w; x++) {
-                    std::array<unsigned char, 4> color = mgen.retrieve_r3({x, y}, {w, h}, source_img);
-                    data.push_back(color[0]);
-                    data.push_back(color[1]);
-                    data.push_back(color[2]);
-                    data.push_back(color[3]);
-                }
-            }
-        } else if(type == 1) {
-            for(int y = 0; y < h; y++) {
-                for(int x = 0; x < w; x++) {
-                    std::array<unsigned char, 4> color = mgen.retrieve_g1({x, y}, {w, h}, source_img);
-                    data.push_back(color[0]);
-                    data.push_back(color[1]);
-                    data.push_back(color[2]);
-                    data.push_back(color[3]);
-                }
-            }
-        } else if(type == 2) {
-            for(int y = 0; y < h; y++) {
-                for(int x = 0; x < w; x++) {
-                    std::array<unsigned char, 4> color = mgen.retrieve_a1({x, y}, {w, h}, f, source_img);
-                    data.push_back(color[0]);
-                    data.push_back(color[1]);
-                    data.push_back(color[2]);
-                    data.push_back(color[3]);
-                }
-            }
-        } else if(type == 3) {
-            for(int y = 0; y < h; y++) {
-                for(int x = 0; x < w; x++) {
-                    std::array<unsigned char, 4> color = mgen.retrieve_x1({x, y}, {w, h}, f, source_img, drop_off_start, drop_off_end);
-                    data.push_back(color[0]);
-                    data.push_back(color[1]);
-                    data.push_back(color[2]);
-                    data.push_back(color[3]);
-                }
-            }
-        }
-        
-        stbi_write_png(filepath.c_str(), w, h, 4, data.data(), 0);
-        clock_t time_end = clock();
-
-        std::cout << "File saved as " << filepath << "\n";
-        std::cout << "The map took " << double(time_end - time_start) / 1000 << " seconds to generate.\n";
-    }
+    glUseProgram(compute_program);
+    glDispatchCompute(width, height, 1);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }

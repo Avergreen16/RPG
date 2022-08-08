@@ -535,8 +535,9 @@ void Setting::render() {
 
     int reference_y = int(player.position[1] / 16) * 16 - 32;
 
+    std::array<uint, total_loaded_chunks> active_chunk_keys_copy = active_chunk_keys;
     for(int i = 0; i < total_loaded_chunks; ++i) {
-        uint key = active_chunk_keys[i];
+        uint key = active_chunk_keys_copy[i];
         
         if(loaded_chunks.contains(key)) {
             Chunk_data& chunk = loaded_chunks[key];
