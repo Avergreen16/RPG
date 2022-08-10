@@ -54,13 +54,15 @@ struct Vertex {
 };
 
 std::vector<Vertex> vertex_vector;
+std::vector<uint32_t> index_vector = {0, 1, 2, 0, 2, 3};
 
 int main() {
     glfwInit();
 
-    vertex_vector.push_back({{0.5f, 0.6f, 0.5f}, {1.0f, 0.0f, 0.0f}});
+    vertex_vector.push_back({{0.5f, 0.7f, 0.5f}, {1.0f, 0.0f, 0.0f}});
     vertex_vector.push_back({{-0.5f, 0.6f, 0.5f}, {0.0f, 1.0f, 0.0f}});
     vertex_vector.push_back({{-0.7f, -0.9f, 0.5f}, {0.0f, 0.0f, 1.0f}});
+    vertex_vector.push_back({{0.6f, -0.8f, 0.5f}, {0.6f, 0.0f, 1.0f}});
 
     GLFWwindow* window = glfwCreateWindow(1000, 600, "test", NULL, NULL);
     glfwMakeContextCurrent(window);
@@ -82,6 +84,12 @@ int main() {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
     glEnableVertexAttribArray(1);
 
+    GLuint ebo_id;
+    glCreateBuffers(1, &ebo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_vector.size() * sizeof(uint32_t), index_vector.data(), GL_STATIC_DRAW);
+
+
     GLuint shader = create_shader(v_src, f_src);
 
     bool should_close = false;
@@ -92,7 +100,7 @@ int main() {
         glBindVertexArray(vao_id);
 
         glUseProgram(shader);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
 
