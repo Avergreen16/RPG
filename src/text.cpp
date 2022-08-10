@@ -110,6 +110,7 @@ std::unordered_map<char, std::array<int, 2>> standard_chars = {
 };
 
 std::unordered_map<char, std::array<int, 2>> hex_chars = {
+    {'-', {323, 5}},
     {'0', {395, 6}},
     {'1', {459, 6}},
     {'2', {465, 6}},
@@ -147,8 +148,8 @@ std::unordered_map<char, int> hex_to_dec = {
     {'f', 15}
 };
 
-std::array<char, 10> valid_numbers = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
-std::array<char, 16> valid_hex_numbers = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+std::array<char, 11> valid_numbers = {'-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+std::array<char, 17> valid_hex_numbers = {'-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
 int get_string_length(std::string str, int text_scale) {
     int collector = -1;

@@ -72,6 +72,9 @@ struct Player {
     directions direction_facing = SOUTH;
     bool keep_moving = false;
 
+    int max_health = 8;
+    int health = 8;
+
     text_struct name;
 
     Player() = default;
@@ -80,6 +83,8 @@ struct Player {
     void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size);
 
     void tick(uint delta);
+
+    void health_change(uint change);
 };
 
 struct texture_object {
@@ -196,4 +201,6 @@ struct Setting {
     void game_math(uint delta);
 
     void render();
+
+    void render_gui();
 };

@@ -153,6 +153,12 @@ void Player::tick(uint delta) { // delta is in nanoseconds
     active_sprite[0] = sprite_counter.value;
 }
 
+void Player::health_change(uint change) {
+    health += change;
+    if(health > max_health) health = max_health;
+    else if(health < 0) health = 0;
+}
+
 bool Setting::check_if_moved_chunk() {
     uint chunk_key = (uint)(player.position[0] / 16) + (uint)(player.position[1] / 16) * world_size_chunks[0];
     if(chunk_key != current_chunk) {
@@ -236,6 +242,47 @@ void Setting::process_input(std::string input, Player& player, std::list<text_st
                 player.position = {x_val + 0.5, y_val + 0.25};
                 insert_chat_message("Teleported " + player.name.str + "\\cfff to coordinates: " + std::to_string(x_val) + " " + std::to_string(y_val));
             }
+        } else if(strcmp(input.substr(1, 8).data(), "hchange ") == 0) {
+            std::string change = "";
+            bool digits = false;
+            uint rad = 10;
+
+            uint pos = 9;
+            if(strcmp(input.substr(9, 2).data(), "\\x") == 0) {
+                rad = 16;
+                pos += 2;
+                for(char c : input.substr(pos)) {
+                    pos++;
+                    if(std::find(valid_hex_numbers.begin(), valid_hex_numbers.end(), c) == valid_hex_numbers.end()) {
+                        break;
+                    } else {
+                        digits = true;
+                        change += c;
+                    }
+                }
+            } else {
+                for(char c : input.substr(pos)) {
+                    pos++;
+                    if(std::find(valid_numbers.begin(), valid_numbers.end(), c) == valid_numbers.end()) {
+                        break;
+                    } else {
+                        digits = true;
+                        change += c;
+                    }
+                }
+            }
+
+            if(digits) {
+                int change_val = strtol(change.data(), nullptr, rad);
+                player.health_change(change_val);
+                if(change_val < 0) {
+                    insert_chat_message(player.name.str + " \\cffftook " + std::to_string(change_val * -1) + " damage.");
+                } else {
+                    insert_chat_message(player.name.str + " \\cfffgained " + std::to_string(change_val) + " health.");
+                }
+            } else {
+                insert_chat_message("Invalid parameters. (*hchange)");
+            }
         } else {
             text_struct message;
             message.set_values("Invalid command.", 600, 2);
@@ -276,7 +323,8 @@ void Setting::load_textures_into_map() {
         "res\\gui\\textsource.png",
         "res\\entities\\Player\\avergreen_spritesheet.png",
         "res\\entities\\Bandit\\bandit0_spritesheet.png",
-        "res\\entities\\Bandit\\bandit1_spritesheet.png"
+        "res\\entities\\Bandit\\bandit1_spritesheet.png",
+        "res\\gui\\display.png"
     };
 
     for(uint i = 0; i < addresses.size(); ++i) {
@@ -530,9 +578,6 @@ void Setting::game_math(uint delta) {
 }
 
 void Setting::render() {
-    glClearColor(0.2, 0.2, 0.2, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     int reference_y = int(player.position[1] / 16) * 16 - 32;
 
     std::array<uint, total_loaded_chunks> active_chunk_keys_copy = active_chunk_keys;
@@ -585,8 +630,9 @@ void Setting::render() {
     for(auto& [key, entity] : entity_map) {
         entity.render(reference_y, camera_pos, scale, shader_map[0], {width, height});
     }
+}
 
-    // render coords & version
+void Setting::render_gui() {
     std::string hex_coords = to_hex_string(player.position[0]) + " " + to_hex_string(player.position[1]);
     std::string dec_coords = std::to_string(int(player.position[0])) + " " + std::to_string(int(player.position[1]));
 
@@ -637,5 +683,10 @@ void Setting::render() {
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 
-    glfwSwapBuffers(window);
+    bool dead_heart = false;
+    for(int i = 0; i < 8; i++) {
+        if(i >= player.health) dead_heart = true;
+        draw_tile(shader_map[0], texture_map[5].id, {12.0f + i * 57 - width / 2, 12.0f - height / 2, 48.0f, 42.0f}, {16 * dead_heart, 1, 16, 14, 128, 128}, {width, height}, 0.0005f);
+        //draw_tile(shader_map[0], texture_map[5].id, {12.0f + i * 33 - width / 2, 12.0f - height / 2, 27.0f, 24.0f}, {32 + 9 * dead_heart, 0, 9, 8, 128, 128}, {width, height}, 0.0005f);
+    }
 }

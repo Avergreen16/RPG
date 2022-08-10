@@ -109,7 +109,15 @@ int main() {
         uint delta_time = current_time - delta_time_container;
         delta_time_container = current_time;
         setting.game_math(delta_time);
+
+        
+        glClearColor(0.2, 0.2, 0.2, 1.0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
         setting.render();
+        setting.render_gui();
+        
+        glfwSwapBuffers(window);
 
         game_running = !glfwWindowShouldClose(window);
     }
