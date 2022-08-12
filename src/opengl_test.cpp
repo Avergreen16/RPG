@@ -1,20 +1,27 @@
 #define GLFW_INCLUDE_NONE
 #include <glfw\glfw3.h>
 #include <glad\glad.h>
+#include <glm-master\glm\glm.hpp>
+#include <glm-master\glm\gtc\matrix_transform.hpp>
 
 #include <vector>
 #include <array>
 #include <iostream>
+#include <map>
 
 const char* v_src = R"""(
 #version 460 core
 layout(location = 0) in vec3 inpos;
 layout(location = 1) in vec3 incol;
 
+uniform mat4 trans_mat;
+uniform mat4 proj_mat;
+uniform mat4 view_mat;
+
 out vec3 fcol;
 
 void main() {
-    gl_Position = vec4(inpos, 1.0);
+    gl_Position = proj_mat * view_mat * (trans_mat * vec4(inpos, 1.0));
     fcol = incol;
 }
 )""";
@@ -24,8 +31,10 @@ const char* f_src = R"""(
 
 in vec3 fcol;
 
+out vec4 FragColor;
+
 void main() {
-    gl_FragColor = vec4(fcol, 1.0);
+    FragColor = vec4(fcol, 1.0);
 }
 )""";
 
@@ -48,23 +57,96 @@ GLuint create_shader(const char* vertex_shader, const char* fragment_shader) {
     return shader;
 }
 
+float dist = 200.0f;
+float xdeg = 180.0f;
+float zdeg = 0.0f;
+glm::vec3 camera_dir(-1.0f, 0.0f, 0.0f);
+glm::vec3 camera_pos(10.0f, 0.0f, 0.0f);
+glm::vec2 move_dir(-1.0f, 0.0f);
+
+std::map<int, bool> user_input_array = {
+    {GLFW_KEY_W, false},
+    {GLFW_KEY_A, false},
+    {GLFW_KEY_S, false},
+    {GLFW_KEY_D, false},
+    {GLFW_KEY_SPACE, false},
+    {GLFW_KEY_LEFT_SHIFT, false},
+    {GLFW_MOUSE_BUTTON_LEFT, false}
+};
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    if(yoffset > 0) dist /= 1.2f;
+    else dist *= 1.2f;
+}
+
+void update_camera_dir() {
+    float temp_x = cos(glm::radians(xdeg));
+    float temp_y = sin(glm::radians(xdeg));
+    float width_at_z = cos(glm::radians(zdeg));
+    float z = sin(glm::radians(zdeg));
+    camera_dir = glm::vec3(temp_x * width_at_z, temp_y * width_at_z, z);
+
+    move_dir = glm::vec2(temp_x, temp_y);
+}
+
+std::array<double, 2> mouse_pos;
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+    if(user_input_array[GLFW_MOUSE_BUTTON_LEFT]) {
+        double mouse_pos_change_x = xpos - mouse_pos[0];
+        double mouse_pos_change_y = ypos - mouse_pos[1];
+
+        xdeg -= mouse_pos_change_x / 2;
+        if(xdeg >= 360) xdeg -= 360;
+        else if(xdeg < 0) xdeg += 360;
+        zdeg = std::max(std::min(89.9, zdeg - mouse_pos_change_y / 2), -89.9);
+
+        update_camera_dir();
+    }
+    mouse_pos = {xpos, ypos};
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if(button == GLFW_MOUSE_BUTTON_LEFT) {
+        if(action == GLFW_PRESS) {
+            user_input_array[GLFW_MOUSE_BUTTON_LEFT] = true;
+        } else if(action == GLFW_RELEASE) {
+            user_input_array[GLFW_MOUSE_BUTTON_LEFT] = false;
+        }
+    }
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if(action == GLFW_PRESS) {
+        if(user_input_array.contains(key)) {
+            user_input_array[key] = true;
+        }
+    } else if(action == GLFW_RELEASE) {
+       if(user_input_array.find(key) != user_input_array.end()) user_input_array[key] = false;
+    }
+}
+
 struct Vertex {
     std::array<float, 3> position;
     std::array<float, 3> color;
 };
 
 std::vector<Vertex> vertex_vector;
-std::vector<uint32_t> index_vector = {0, 1, 2, 0, 2, 3};
+std::vector<uint32_t> index_vector = {0, 1, 2, 1, 2, 3, 0, 2, 4, 2, 4, 6, 0, 1, 4, 1, 4, 5, 1, 3, 5, 3, 5, 7, 2, 3, 6, 3, 6, 7, 4, 5, 6, 5, 6, 7};
 
 int main() {
+    int width = 1000, height = 600;
     glfwInit();
 
-    vertex_vector.push_back({{0.5f, 0.7f, 0.5f}, {1.0f, 0.0f, 0.0f}});
-    vertex_vector.push_back({{-0.5f, 0.6f, 0.5f}, {0.0f, 1.0f, 0.0f}});
-    vertex_vector.push_back({{-0.7f, -0.9f, 0.5f}, {0.0f, 0.0f, 1.0f}});
-    vertex_vector.push_back({{0.6f, -0.8f, 0.5f}, {0.6f, 0.0f, 1.0f}});
+    vertex_vector.push_back({{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}});
+    vertex_vector.push_back({{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}});
+    vertex_vector.push_back({{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}});
+    vertex_vector.push_back({{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}});
+    vertex_vector.push_back({{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}});
+    vertex_vector.push_back({{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}});
+    vertex_vector.push_back({{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}});
+    vertex_vector.push_back({{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 0.0f}});
 
-    GLFWwindow* window = glfwCreateWindow(1000, 600, "test", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(width, height, "test", NULL, NULL);
     glfwMakeContextCurrent(window);
     gladLoadGL();
 
@@ -89,23 +171,167 @@ int main() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_id);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_vector.size() * sizeof(uint32_t), index_vector.data(), GL_STATIC_DRAW);
 
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
 
-    GLuint shader = create_shader(v_src, f_src);
+    GLuint v_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(v_shader, 1, &v_src, 0);
+    glCompileShader(v_shader);
+
+    GLint is_compiled = 0;
+    glGetShaderiv(v_shader, GL_COMPILE_STATUS, &is_compiled);
+    if(is_compiled == GL_FALSE) {
+        GLint max_length = 0;
+        glGetShaderiv(v_shader, GL_INFO_LOG_LENGTH, &max_length);
+
+        std::vector<GLchar> info_log(max_length);
+        glGetShaderInfoLog(v_shader, max_length, &max_length, info_log.data());
+
+        printf("Vertex shader failed to compile: \n%s", info_log.data());
+    }
+
+    GLuint f_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(f_shader, 1, &f_src, 0);
+    glCompileShader(f_shader);
+
+    is_compiled = 0;
+    glGetShaderiv(f_shader, GL_COMPILE_STATUS, &is_compiled);
+    if(is_compiled == GL_FALSE) {
+        GLint max_length = 0;
+        glGetShaderiv(f_shader, GL_INFO_LOG_LENGTH, &max_length);
+
+        std::vector<GLchar> info_log(max_length);
+        glGetShaderInfoLog(f_shader, max_length, &max_length, info_log.data());
+
+        printf("Fragment shader failed to compile: \n%s", info_log.data());
+    }
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, v_shader);
+    glAttachShader(program, f_shader);
+    glLinkProgram(program);
+
+    GLint is_linked = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &is_compiled);
+    if(is_compiled == GL_FALSE) {
+        GLint max_length = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &max_length);
+
+        std::vector<GLchar> info_log(max_length);
+        glGetProgramInfoLog(program, max_length, &max_length, info_log.data());
+
+        printf("Shader failed to link: \n%s", info_log.data());
+    }
+
+    int num_uniforms;
+    glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &num_uniforms);
+
+    int max_char_len;
+    glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_char_len);
+    if(num_uniforms > 0 && max_char_len > 0) {
+        std::vector<char> char_buffer(max_char_len);
+        for(int i = 0; i < num_uniforms; i++) {
+            int length, size;
+            GLenum data_type;
+            glGetActiveUniform(program, i, max_char_len, &length, &size, &data_type, char_buffer.data());
+            GLint var_location = glGetUniformLocation(program, char_buffer.data());
+            printf("Uniform %s has location %i\n", char_buffer.data(), var_location);
+        }
+    }
+
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, cursor_position_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetKeyCallback(window, key_callback);
+
+    glm::vec3 scale(16.0f, 16.0f, 16.0f);
+    float rotation = 0.0f;
+    glm::vec3 position(0.0f, 0.0f, 0.0f);
 
     bool should_close = false;
     while(!should_close) {
-        glClear(GL_COLOR_BUFFER_BIT);
+        glfwGetFramebufferSize(window, &width, &height);
+        glViewport(0, 0, width, height);
+
+        glfwPollEvents();
+
+        glm::vec2 move_vector(0.0f, 0.0f);
+
+        if(user_input_array[GLFW_KEY_W]) {
+            move_vector.x += move_dir.x * 0.1;
+            move_vector.y += move_dir.y * 0.1;
+        } 
+        if(user_input_array[GLFW_KEY_A]) {
+            move_vector.x -= move_dir.y * 0.1;
+            move_vector.y += move_dir.x * 0.1;
+        } 
+        if(user_input_array[GLFW_KEY_S]) {
+            move_vector.x -= move_dir.x * 0.1;
+            move_vector.y -= move_dir.y * 0.1;
+        }
+        if(user_input_array[GLFW_KEY_D]) {
+            move_vector.x += move_dir.y * 0.1;
+            move_vector.y -= move_dir.x * 0.1;
+        }
+
+        glm::normalize(move_vector);
+        camera_pos += glm::vec3(move_vector, 0.0f);
+
+        if(user_input_array[GLFW_KEY_SPACE]) {
+            camera_pos.z += 0.1f;
+        }
+        if(user_input_array[GLFW_KEY_LEFT_SHIFT]) {
+            camera_pos.z -= 0.1f;
+        }
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         glClearColor(0.2, 0.2, 0.2, 1.0);
         glBindVertexArray(vao_id);
 
-        glUseProgram(shader);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glm::mat4 transform = glm::identity<glm::mat4>();
+        transform = glm::scale(transform, scale);
+        transform = glm::rotate(transform, glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+        transform = glm::translate(transform, position);
+
+        glm::vec3 center = camera_pos + camera_dir;
+        glm::vec3 up(0.0f, 0.0f, 1.0f);
+        glm::mat4 view_matrix = glm::lookAt(camera_pos, center, up);
+
+        /*float projection_width = width;
+        float projection_height = height;
+        float aspect_ratio = projection_height / projection_width;
+        float w = 100;
+        float h = w * aspect_ratio;
+
+        float left = -w / 2.0f;
+        float right = w / 2.0f;
+        float bottom = -h / 2.0f;
+        float top = h / 2.0f;*/
+        float near = 0.5f;
+        float far = 1000.0f;
+
+        glm::mat4 projection = glm::perspective(45.0f, float(width) / height, near, far);//glm::ortho(left, right, bottom, top, near, far);
+
+        glUseProgram(program);
+
+        glUniformMatrix4fv(2, 1, GL_FALSE, &transform[0][0]); // trans, proj, view
+        glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &projection[0][0]);
+
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
 
         should_close = glfwWindowShouldClose(window);
     }
+
+    glDeleteBuffers(1, &array_buffer_id);
+    glDeleteBuffers(1, &ebo_id);
+    glDeleteVertexArrays(1, &vao_id);
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
 
     return 0;
 }
