@@ -98,6 +98,8 @@ int main() {
     time_t delta_time_container = get_time();
     time_t packet_time_container = get_time();
 
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
     while(game_running) {
         uint current_time = get_time();
         uint packet_delta_time = current_time - packet_time_container;

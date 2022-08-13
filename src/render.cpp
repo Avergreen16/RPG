@@ -197,10 +197,10 @@ void draw_tile(unsigned int shader, unsigned int texture, std::array<float, 4> d
 }
 
 float vertices[] = {
-    0.0f, 0.0f, 0.0f, 1.0f,
-    1.0f, 0.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 0.0f,
-    1.0f, 1.0f, 1.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 1.0f
+    0.0f, 0.0f, 0.0f, 0.0f,
+    1.0f, 0.0f, 1.0f, 0.0f,
+    1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 1.0f,
+    0.0f, 1.0f, 0.0f, 1.0f,
+    0.0f, 0.0f, 0.0f, 0.0f
 };

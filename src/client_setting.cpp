@@ -524,6 +524,7 @@ void Setting::char_callback(GLFWwindow* window, uint codepoint) {
 }
 
 Setting::Setting(GLFWwindow* window, netwk::TCP_client& connection_ref, std::array<double, 2> player_start_pos, std::string name) : connection(connection_ref) {
+    stbi_set_flip_vertically_on_load(1);
     load_textures_into_map();
     create_shaders();
     player = Player(this, player_start_pos, texture_map[2].id, name);
