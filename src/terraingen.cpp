@@ -1,20 +1,19 @@
 #define _USE_MATH_DEFINES
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-#define GLFW_INCLUDE_NONE
-#include <glfw\glfw3.h>
-#include <glad\glad.h>
 
 #include <cmath>
 #include <iostream>
 #include <ctime>
 #include <array>
 
-#include "worldgen.cpp"
+//#include "worldgen.cpp"
+#include "PerlinNoise-master\PerlinNoise.hpp"
+#include "glm-master\glm\glm.hpp"
 
-std::vector<unsigned char> data;
-
-struct Mapgen {
+/*struct Mapgen {
     PerlinNoiseFactory pfac1;
     PerlinNoiseFactory pfac2;
     PerlinNoiseFactory pfac3;
@@ -87,36 +86,49 @@ struct Mapgen {
         std::array<unsigned char, 4> biome = get_pixel_array(source_image, {floor(density), 0}, 12);
         return biome;
     }
-};
+};*/
 
-const char* compute_shader_source = R"""(
-#version 460 core;
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-layout(rgba32f, binding = 0) uniform image2D screen;
-
-void main() {
-    
+std::array<unsigned char, 4> get_pixel_array(unsigned char* data, std::array<int, 2> pixel, int image_width) {
+    int pixel_index = pixel[0] + pixel[1] * image_width;
+    return {data[pixel_index * 4], data[pixel_index * 4 + 1], data[pixel_index * 4 + 2], data[pixel_index * 4 + 3]};
 }
-)""";
+
+std::vector<unsigned char> image_data;
+
+template<typename type>
+type clamp(type x, type min, type max) {
+    return std::min(std::max(x, min), max);
+}
 
 int main() {
-    const uint width = 1024, height = 512;
+    const unsigned int width = 1024, height = 512;
 
-    if(!glfwInit()) {
-        std::cout << "glfw failure (init)\n";
-        return 1;
+    image_data.resize(width * height * 4);
+
+    std::array<int, 3> info;
+    unsigned char* data = stbi_load("biome_map_t0.png", &info[0], &info[1], &info[2], 4);
+
+    std::array<siv::PerlinNoise, 3> noise = {siv::PerlinNoise(4097), siv::PerlinNoise(4098), siv::PerlinNoise(4099)};
+
+    for(double x = 0; x < width; x++) {
+        double angle = 2 * M_PI * (x / width);
+        std::array<double, 2> xy1{sin(angle), cos(angle)};
+        for(double y = 0; y < height; y++) {
+            double z_angle = M_PI * (y / height - 0.5);
+            double xy_magnitude = cos(z_angle);
+            std::array<double, 3> position = {xy1[0] * xy_magnitude, xy1[1] * xy_magnitude, sin(z_angle)};
+            double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
+            double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
+            double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
+
+            std::array<unsigned char, 4> biome = get_pixel_array(data, {clamp(floor(elev), 0.0, 11.0) * 12 + clamp(floor(humid), 0.0, 11.0), clamp(floor(temp), 0.0, 11.0)}, 144);
+            int index = (x + y * width) * 4;
+            image_data[index] = biome[0];
+            image_data[index + 1] = biome[1];
+            image_data[index + 2] = biome[2];
+            image_data[index + 3] = biome[3];
+        }
     }
-    gladLoadGL();
 
-    uint compute_shader = glCreateShader(GL_COMPUTE_SHADER);
-    glShaderSource(compute_shader, 1, &compute_shader_source, NULL);
-    glCompileShader(compute_shader);
-
-    uint compute_program = glCreateProgram();
-    glAttachShader(compute_program, compute_shader);
-    glLinkProgram(compute_program);
-
-    glUseProgram(compute_program);
-    glDispatchCompute(width, height, 1);
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    stbi_write_png("test_map.png", width, height, 4, image_data.data(), 0);
 }

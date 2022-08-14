@@ -46,6 +46,20 @@ void main() {
 }
 )""";
 
+const char* f_src2 = R"""(
+#version 460 core
+
+in vec2 f_texcoord;
+
+uniform sampler2D input_texture;
+
+out vec4 FragColor;
+
+void main() {
+    FragColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+}
+)""";
+
 GLuint create_shader(const char* vertex_shader, const char* fragment_shader) {
     GLuint v_shader = glCreateShader(GL_VERTEX_SHADER);
     GLuint f_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -69,7 +83,7 @@ float dist = 200.0f;
 float xdeg = 0.0f;
 float zdeg = 0.0f;
 glm::vec3 camera_dir(1.0f, 0.0f, 0.0f);
-glm::vec3 camera_pos(-20.0f, 0.0f, 0.0f);
+glm::vec3 camera_pos(-20.0f, -20.0f, 0.0f);
 glm::vec2 move_dir(0.0f, -1.0f);
 
 std::map<int, bool> user_input_array = {
@@ -109,6 +123,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
         zdeg = std::max(std::min(89.9, zdeg - mouse_pos_change_y / 2), -89.9);
 
         update_camera_dir();
+        std::cout << move_dir[0] << " " << move_dir[1] << "\n";
     }
     mouse_pos = {xpos, ypos};
 }
@@ -139,7 +154,7 @@ struct Vertex {
 };
 
 std::vector<Vertex> vertex_vector;
-std::vector<uint32_t> index_vector;// = {0, 1, 2, 1, 2, 3, 0, 2, 4, 2, 4, 6, 0, 1, 4, 1, 4, 5, 1, 3, 5, 3, 5, 7, 2, 3, 6, 3, 6, 7, 4, 5, 6, 5, 6, 7};
+std::vector<uint32_t> index_vector;
 
 unsigned int load_texture(char address[], std::array<int, 3> &info) {
     unsigned int texture_id;
@@ -156,174 +171,170 @@ unsigned int load_texture(char address[], std::array<int, 3> &info) {
     return texture_id;
 }
 
-void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, float radius, int div, siv::PerlinNoise& noise) {
-    //vertex_vector.resize((side_split + 1) * (side_split + 1));
-    //index_vector.resize(side_split * side_split * 6);
-    /*for(float j = 0; j < div_vert + 1; j++) {
-        float j_radians = glm::radians(j / div_vert * 180 - 90);
-        float width_at_height = cos(j_radians);
-        for(float i = 0; i < div_around + 1; i++) {
-            float i_radians = glm::radians(i / div_around * 360);
-            glm::vec3 position(cos(i_radians) * width_at_height, sin(i_radians) * width_at_height, sin(j_radians));
-
-            vertex_vector.push_back({position * radius, glm::vec2(i / div_around, j / div_vert)});
-        }        
-    }
-
-    for(int j = 0; j < div_vert; j++) {
-        for(int i = 0; i < div_around; i++) {
-            int current_index = i + j * (div_around + 1);
-            index_vector.push_back(current_index);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index + div_around + 1);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index + div_around + 2);
-            index_vector.push_back(current_index + div_around + 1);
-        }
-    }*/
+void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, float radius, const int div, siv::PerlinNoise& noise, glm::vec3 translation) {
     int vert_per_face = (div + 1) * (div + 1);
 
-    // top +z
+    int correction_vertices = 0;
     for(float y = 0; y < div + 1; y++) {
         for(float x = 0; x < div + 1; x++) {
-            glm::vec3 position(-1.0f + x / div * 2.0f, -1.0f + y / div * 2.0f, 1.0f);
+            glm::vec3 position(-1.0f + x / div * 2.0f, -1.0f + y / div * 2.0f, 0.0f);
+            position.z += 1.0f - std::max(abs(x - div / 2), abs(y - div / 2)) / div * 2;
             position = glm::normalize(position);
+            //double noise_val = noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
+            //if(noise_val > 0.2) position *= 1 + 0.3 * noise_val;
             
-            position *= 1 + 0.2 * noise.normalizedOctave3D_01(position.x, position.y, position.z, 2);
-            position.z *= 0.65;
-            
-            vertex_vector.push_back({position * radius, {atan2f(position.y, position.x) / (2 * M_PI), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
+            vertex_vector.push_back({position * radius + translation, {atan2f(position.y, position.x) / (2 * M_PI) + 0.5f, atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
         }
+    }
+    for(int i = 0; i < div / 2; i++) {
+        vertex_vector.push_back({vertex_vector[i + (div / 2) * (div + 1)].position, {0.0f, vertex_vector[i + (div / 2) * (div + 1)].color.y}});
+        correction_vertices++;
+    }
+    for(float i = 0; i < 8; i++) {
+        vertex_vector.push_back({vertex_vector[(div / 2) + (div / 2) * (div + 1)].position, {i / 8, 1.0f}});
+        correction_vertices++;
     }
     for(int y = 0; y < div; y++) {
         for(int x = 0; x < div; x++) {
             uint32_t current_index = x + y * (div + 1);
-            index_vector.push_back(current_index);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index + div + 2);
-            index_vector.push_back(current_index + div + 1);
+            if((y == div / 2 || y == div / 2 - 1) && (x == div / 2 || x == div / 2 - 1)) {
+                if(y == div / 2) {
+                    if(x == div / 2) {
+                        index_vector.push_back(vert_per_face + correction_vertices - 4);
+                        index_vector.push_back(current_index + 1);
+                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(vert_per_face + correction_vertices - 3);
+                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(current_index + div + 1);
+                    } else {
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(vert_per_face + correction_vertices - 1);
+                        index_vector.push_back(current_index + div + 1);
+                        index_vector.push_back(vert_per_face + correction_vertices - 2);
+                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(current_index + div + 1);
+                    }
+                } else {
+                    if(x == div / 2) {
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(current_index + 1);
+                        index_vector.push_back(vert_per_face + correction_vertices - 6);
+                        index_vector.push_back(current_index + 1);
+                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(vert_per_face + correction_vertices - 5);
+                    } else {
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(current_index + 1);
+                        index_vector.push_back(vert_per_face + correction_vertices - 7);
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(vert_per_face + correction_vertices - 8);
+                        index_vector.push_back(vert_per_face + correction_vertices - 9);
+                    }
+                }
+            } else if(y == (div / 2) - 1 && x < div / 2 - 1) {
+                index_vector.push_back(current_index);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(vert_per_face + x);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(vert_per_face + x + 1);
+                index_vector.push_back(vert_per_face + x);
+            } else if(x == y) {
+                index_vector.push_back(current_index);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(current_index + div + 2);
+                index_vector.push_back(current_index);
+                index_vector.push_back(current_index + div + 2);
+                index_vector.push_back(current_index + div + 1);
+            } else {
+                index_vector.push_back(current_index);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(current_index + div + 1);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(current_index + div + 2);
+                index_vector.push_back(current_index + div + 1);
+            }
         }
     }
 
-    // side +y
-    for(float z = 0; z < div + 1; z++) {
-        for(float x = 0; x < div + 1; x++) {
-            glm::vec3 position(-1.0f + x / div * 2.0f, 1.0f, -1.0f + z / div * 2.0f);
-            position = glm::normalize(position);
-            
-            position *= 1 + 0.2 * noise.normalizedOctave3D_01(position.x, position.y, position.z, 2);
-            position.z *= 0.65;
-            
-            vertex_vector.push_back({position * radius, {atan2f(position.y, position.x) / (2 * M_PI), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
-        }
-    }
-    for(int z = 0; z < div; z++) {
-        for(int x = 0; x < div; x++) {
-            uint32_t current_index = vert_per_face + x + z * (div + 1);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + div + 2);
-            index_vector.push_back(current_index + 1);
-        }
-    }
-
-    // side +x
-    for(float z = 0; z < div + 1; z++) {
-        for(float y = 0; y < div + 1; y++) {
-            glm::vec3 position(1.0f, -1.0f + y / div * 2.0f, -1.0f + z / div * 2.0f);
-            position = glm::normalize(position);
-            
-            position *= 1 + 0.2 * noise.normalizedOctave3D_01(position.x, position.y, position.z, 2);
-            position.z *= 0.65;
-            
-            vertex_vector.push_back({position * radius, {atan2f(position.y, position.x) / (2 * M_PI), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
-        }
-    }
-    for(int z = 0; z < div; z++) {
-        for(int y = 0; y < div; y++) {
-            uint32_t current_index = vert_per_face * 2 + y + z * (div + 1);
-            index_vector.push_back(current_index);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index + div + 2);
-            index_vector.push_back(current_index + div + 1);
-        }
-    }
-
-    // bottom -z
     for(float y = 0; y < div + 1; y++) {
         for(float x = 0; x < div + 1; x++) {
-            glm::vec3 position(-1.0f + x / div * 2.0f, -1.0f + y / div * 2.0f, -1.0f);
+            glm::vec3 position(-1.0f + x / div * 2.0f, -1.0f + y / div * 2.0f, 0.0f);
+            position.z -= 1.0f - std::max(abs(x - div / 2), abs(y - div / 2)) / div * 2;
             position = glm::normalize(position);
-            
-            position *= 1 + 0.2 * noise.normalizedOctave3D_01(position.x, position.y, position.z, 2);
-            position.z *= 0.65;
-            
-            vertex_vector.push_back({position * radius, {atan2f(position.y, position.x) / (2 * M_PI), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
+
+            //position *= 1 + 0.3 * noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
+
+            vertex_vector.push_back({position * radius + translation, {atan2f(position.y, position.x) / (2 * M_PI) + 0.5f, atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
         }
+    }
+    int correction_vertices_2 = 0;
+    for(int i = 0; i < div / 2; i++) {
+        vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].position, {0.0f, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].color.y}});
+        correction_vertices_2++;
+    }
+    for(float i = 0; i < 8; i++) {
+        vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)].position, {i / 8, 0.0f}});
+        correction_vertices_2++;
     }
     for(int y = 0; y < div; y++) {
         for(int x = 0; x < div; x++) {
-            uint32_t current_index = vert_per_face * 3 + x + y * (div + 1);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + div + 2);
-            index_vector.push_back(current_index + 1);
-        }
-    }
-
-    // side -y
-    for(float z = 0; z < div + 1; z++) {
-        for(float x = 0; x < div + 1; x++) {
-            glm::vec3 position(-1.0f + x / div * 2.0f, -1.0f, -1.0f + z / div * 2.0f);
-            position = glm::normalize(position);
-            
-            position *= 1 + 0.2 * noise.normalizedOctave3D_01(position.x, position.y, position.z, 2);
-            position.z *= 0.65;
-            
-            vertex_vector.push_back({position * radius, {atan2f(position.y, position.x) / (2 * M_PI), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
-        }
-    }
-    for(int z = 0; z < div; z++) {
-        for(int x = 0; x < div; x++) {
-            uint32_t current_index = vert_per_face * 4 + x + z * (div + 1);
-            index_vector.push_back(current_index);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index + div + 2);
-            index_vector.push_back(current_index + div + 1);
-        }
-    }
-
-    // side -x
-    for(float z = 0; z < div + 1; z++) {
-        for(float y = 0; y < div + 1; y++) {
-            glm::vec3 position(-1.0f, -1.0f + y / div * 2.0f, -1.0f + z / div * 2.0f);
-            position = glm::normalize(position);
-            
-            position *= 1 + 0.2 * noise.normalizedOctave3D_01(position.x, position.y, position.z, 2);
-            position.z *= 0.65;
-            
-            vertex_vector.push_back({position * radius, {atan2f(position.y, position.x) / (2 * M_PI), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
-        }
-    }
-    for(int z = 0; z < div; z++) {
-        for(int y = 0; y < div; y++) {
-            uint32_t current_index = vert_per_face * 5 + y + z * (div + 1);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + 1);
-            index_vector.push_back(current_index);
-            index_vector.push_back(current_index + div + 1);
-            index_vector.push_back(current_index + div + 2);
-            index_vector.push_back(current_index + 1);
+            uint32_t current_index = vert_per_face + correction_vertices + x + y * (div + 1);
+            if((y == div / 2 || y == div / 2 - 1) && (x == div / 2 || x == div / 2 - 1)) {
+                if(y == div / 2) {
+                    if(x == div / 2) {
+                        index_vector.push_back(current_index + 1);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 4);
+                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 3);
+                        index_vector.push_back(current_index + div + 1);
+                    } else {
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 1);
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(current_index + div + 1);
+                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 2);
+                        index_vector.push_back(current_index + div + 1);
+                    }
+                } else {
+                    if(x == div / 2) {
+                        index_vector.push_back(current_index + 1);
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 6);
+                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(current_index + 1);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 5);
+                    } else {
+                        index_vector.push_back(current_index + 1);
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 7);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 8);
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 9);
+                    }
+                }
+            } else if(y == (div / 2) - 1 && x < div / 2 - 1) {
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(current_index);
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + x);
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + x + 1);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + x);
+            } else if(x == y) {
+                index_vector.push_back(current_index);
+                index_vector.push_back(current_index + div + 2);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(current_index);
+                index_vector.push_back(current_index + div + 1);
+                index_vector.push_back(current_index + div + 2);
+            } else {
+                index_vector.push_back(current_index);
+                index_vector.push_back(current_index + div + 1);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(current_index + div + 1);
+                index_vector.push_back(current_index + div + 2);
+            }
         }
     }
 }
@@ -332,16 +343,8 @@ int main() {
     int width = 1000, height = 600;
     glfwInit();
 
-    /*vertex_vector.push_back({{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}});
-    vertex_vector.push_back({{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}});
-    vertex_vector.push_back({{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}});
-    vertex_vector.push_back({{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}});
-    vertex_vector.push_back({{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}});
-    vertex_vector.push_back({{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}});
-    vertex_vector.push_back({{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}});
-    vertex_vector.push_back({{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 0.0f}});*/
     siv::PerlinNoise noise(4097);
-    generate_sphere(vertex_vector, index_vector, 16.0f, 100, noise);
+    generate_sphere(vertex_vector, index_vector, 1.0f, 80, noise, {0.0f, 0.0f, 0.0f});
 
     GLFWwindow* window = glfwCreateWindow(width, height, "test", NULL, NULL);
     glfwMakeContextCurrent(window);
@@ -369,7 +372,7 @@ int main() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_vector.size() * sizeof(uint32_t), index_vector.data(), GL_STATIC_DRAW);
 
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
+    glDepthFunc(GL_LEQUAL);
 
     GLuint v_shader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(v_shader, 1, &v_src, 0);
@@ -436,21 +439,32 @@ int main() {
         }
     }
 
+    GLuint outline_shader = create_shader(v_src, f_src2);
+
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetKeyCallback(window, key_callback);
 
-    glm::vec3 scale(1.0f, 1.0f, 1.0f);
+    glm::vec3 scale(16.0f, 16.0f, 16.0f);
     float rotation = 0.0f;
     glm::vec3 position(0.0f, 0.0f, 0.0f);
+    glm::vec3 rot_axis(0.3f, 1.0f, 0.0f);
+
+    glm::vec3 scale_2(190.0f, 190.0f, 190.0f);
+    float rotation_2 = 16.0f;
+    glm::vec3 position_2(800.0f, 200.0f, 20.0f);
+
+    glm::vec3 scale_3(1400.0f, 1400.0f, 1400.0f);
+    float rotation_3 = 0.0f;
+    glm::vec3 position_3(30000.0f, 25000.0f, -600.0f);
 
     stbi_set_flip_vertically_on_load(1);
 
-    glPolygonMode(GL_BACK, GL_LINE);
-
     std::array<int, 3> data_array;
     GLuint planet_texture = load_texture("res\\planets\\terra.png", data_array);
+    GLuint gas_giant_texture = load_texture("res\\planets\\gasgiant.png", data_array);
+    GLuint sun_texture = load_texture("res\\planets\\sun.png", data_array);
 
     bool should_close = false;
     while(!should_close) {
@@ -493,16 +507,26 @@ int main() {
         if(user_input_array[GLFW_KEY_LEFT_SHIFT]) {
             camera_pos.z -= 0.1f;
         }
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         glClearColor(0.2, 0.2, 0.2, 1.0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
         glBindVertexArray(vao_id);
 
-        glm::mat4 transform = glm::identity<glm::mat4>();
-        transform = glm::scale(transform, scale);
-        transform = glm::rotate(transform, glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
-        transform = glm::translate(transform, position);
+        glm::mat4 transform_matrix = glm::identity<glm::mat4>();
+        transform_matrix = glm::translate(transform_matrix, position);
+        transform_matrix = glm::rotate(transform_matrix, glm::radians(rotation), rot_axis);
+        transform_matrix = glm::scale(transform_matrix, scale);
+
+        glm::mat4 transform_matrix_2 = glm::identity<glm::mat4>();
+        transform_matrix_2 = glm::translate(transform_matrix_2, position_2);
+        transform_matrix_2 = glm::rotate(transform_matrix_2, glm::radians(rotation_2), rot_axis);
+        transform_matrix_2 = glm::scale(transform_matrix_2, scale_2);
+
+        glm::mat4 transform_matrix_3 = glm::identity<glm::mat4>();
+        transform_matrix_3 = glm::translate(transform_matrix_3, position_3);
+        transform_matrix_3 = glm::rotate(transform_matrix_3, glm::radians(rotation_3), rot_axis);
+        transform_matrix_3 = glm::scale(transform_matrix_3, scale_3);
 
         glm::vec3 center = camera_pos + camera_dir;
         glm::vec3 up(0.0f, 0.0f, 1.0f);
@@ -519,18 +543,44 @@ int main() {
         float bottom = -h / 2.0f;
         float top = h / 2.0f;*/
         float near = 0.5f;
-        float far = 2048.0f;
+        float far = 100000.0f;
 
-        glm::mat4 projection = glm::perspective(45.0f, float(width) / height, near, far);//glm::ortho(left, right, bottom, top, near, far);
+        glm::mat4 projection_matrix = glm::perspective(45.0f, float(width) / height, near, far);//glm::ortho(left, right, bottom, top, near, far);
 
         glUseProgram(program);
 
         glBindTexture(GL_TEXTURE_2D, planet_texture);
 
-        glUniformMatrix4fv(2, 1, GL_FALSE, &transform[0][0]);
+        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(0, 1, GL_FALSE, &projection[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
 
+        //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
+
+        /*glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        glUseProgram(outline_shader);
+
+        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix[0][0]);
+        glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);*/
+        glBindTexture(GL_TEXTURE_2D, gas_giant_texture);
+
+        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix_2[0][0]);
+        glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
+        
+        glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
+
+
+        glBindTexture(GL_TEXTURE_2D, sun_texture);
+
+        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix_3[0][0]);
+        glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
+        
         glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
