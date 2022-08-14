@@ -18,13 +18,13 @@
 const char* v_src = R"""(
 #version 460 core
 layout(location = 0) in vec3 inpos;
-layout(location = 1) in vec2 in_texcoord;
+layout(location = 1) in vec3 in_texcoord;
 
 uniform mat4 trans_mat;
 uniform mat4 proj_mat;
 uniform mat4 view_mat;
 
-out vec2 f_texcoord;
+out vec3 f_texcoord;
 
 void main() {
     gl_Position = proj_mat * view_mat * (trans_mat * vec4(inpos, 1.0));
@@ -35,14 +35,14 @@ void main() {
 const char* f_src = R"""(
 #version 460 core
 
-in vec2 f_texcoord;
+in vec3 f_texcoord;
 
 uniform sampler2D input_texture;
 
 out vec4 FragColor;
 
 void main() {
-    FragColor = texture(input_texture, f_texcoord);
+    FragColor = vec4(f_texcoord, 1.0);//texture(input_texture, f_texcoord);
 }
 )""";
 
@@ -150,7 +150,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 struct Vertex {
     glm::vec3 position;
-    glm::vec2 color;
+    glm::vec3 color;
 };
 
 std::vector<Vertex> vertex_vector;
@@ -171,7 +171,17 @@ unsigned int load_texture(char address[], std::array<int, 3> &info) {
     return texture_id;
 }
 
-void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, float radius, const int div, siv::PerlinNoise& noise, glm::vec3 translation) {
+std::array<unsigned char, 4> get_pixel_array(unsigned char* data, std::array<int, 2> pixel, int image_width) {
+    int pixel_index = pixel[0] + pixel[1] * image_width;
+    return {data[pixel_index * 4], data[pixel_index * 4 + 1], data[pixel_index * 4 + 2], data[pixel_index * 4 + 3]};
+}
+
+template<typename type>
+type clamp(type x, type min, type max) {
+    return std::min(std::max(x, min), max);
+}
+
+void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, float radius, const int div, std::array<siv::PerlinNoise, 3>& noise, glm::vec3 translation, unsigned char* data) {
     int vert_per_face = (div + 1) * (div + 1);
 
     int correction_vertices = 0;
@@ -182,17 +192,24 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             position = glm::normalize(position);
             //double noise_val = noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
             //if(noise_val > 0.2) position *= 1 + 0.3 * noise_val;
+
+            double z_angle = atan(position.z / hypot(position.x, position.y));
+            double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
+            double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
+            double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
+
+            std::array<unsigned char, 4> biome = get_pixel_array(data, {clamp(floor(elev), 0.0, 11.0) * 12 + clamp(floor(humid), 0.0, 11.0), clamp(floor(temp), 0.0, 11.0)}, 144);
             
-            vertex_vector.push_back({position * radius + translation, {atan2f(position.y, position.x) / (2 * M_PI) + 0.5f, atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
+            vertex_vector.push_back({position * radius + translation, {float(biome[0]) / 255, float(biome[1]) / 255, float(biome[2]) / 255}});
         }
     }
     for(int i = 0; i < div / 2; i++) {
-        vertex_vector.push_back({vertex_vector[i + (div / 2) * (div + 1)].position, {0.0f, vertex_vector[i + (div / 2) * (div + 1)].color.y}});
+        vertex_vector.push_back(vertex_vector[i + (div / 2) * (div + 1)]);
         correction_vertices++;
     }
     for(float i = 0; i < 8; i++) {
         if(i != 4) {
-            vertex_vector.push_back({vertex_vector[(div / 2) + (div / 2) * (div + 1)].position, {i / 8, 1.0f}});
+            vertex_vector.push_back(vertex_vector[(div / 2) + (div / 2) * (div + 1)]);
             correction_vertices++;
         }
     }
@@ -265,18 +282,24 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             position = glm::normalize(position);
 
             //position *= 1 + 0.3 * noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
+            double z_angle = atan(position.z / hypot(position.x, position.y));
+            double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
+            double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
+            double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
 
-            vertex_vector.push_back({position * radius + translation, {atan2f(position.y, position.x) / (2 * M_PI) + 0.5f, atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
+            std::array<unsigned char, 4> biome = get_pixel_array(data, {clamp(floor(elev), 0.0, 11.0) * 12 + clamp(floor(humid), 0.0, 11.0), clamp(floor(temp), 0.0, 11.0)}, 144);
+            
+            vertex_vector.push_back({position * radius + translation, {float(biome[0]) / 255, float(biome[1]) / 255, float(biome[2]) / 255}});
         }
     }
     int correction_vertices_2 = 0;
     for(int i = 0; i < div / 2; i++) {
-        vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].position, {0.0f, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].color.y}});
+        vertex_vector.push_back(vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)]);
         correction_vertices_2++;
     }
     for(float i = 0; i < 8; i++) {
         if(i != 4) {
-            vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)].position, {i / 8, 0.0f}});
+            vertex_vector.push_back(vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)]);
             correction_vertices_2++;
         }
     }
@@ -347,8 +370,11 @@ int main() {
     int width = 1000, height = 600;
     glfwInit();
 
-    siv::PerlinNoise noise(4097);
-    generate_sphere(vertex_vector, index_vector, 1.0f, 80, noise, {0.0f, 0.0f, 0.0f});
+    std::array<int, 3> info;
+    unsigned char* data = stbi_load("biome_map_t0.png", &info[0], &info[1], &info[2], 4);
+
+    std::array<siv::PerlinNoise, 3> noise{siv::PerlinNoise(4097), siv::PerlinNoise(4098), siv::PerlinNoise(4099)};
+    generate_sphere(vertex_vector, index_vector, 1.0f, 80, noise, {0.0f, 0.0f, 0.0f}, data);
 
     GLFWwindow* window = glfwCreateWindow(width, height, "test", NULL, NULL);
     glfwMakeContextCurrent(window);
@@ -367,7 +393,7 @@ int main() {
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
     glEnableVertexAttribArray(1);
 
     GLuint ebo_id;
