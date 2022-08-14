@@ -180,22 +180,23 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             glm::vec3 position(-1.0f + x / div * 2.0f, -1.0f + y / div * 2.0f, 0.0f);
             position.z += 1.0f - std::max(abs(x - div / 2), abs(y - div / 2)) / div * 2;
             position = glm::normalize(position);
-            //double noise_val = noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
-            //if(noise_val > 0.2) position *= 1 + 0.3 * noise_val;
+
+            position *= 1 + noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
             
-            vertex_vector.push_back({position * radius + translation, {atan2f(position.y, position.x) / (2 * M_PI) + 0.5f, atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
+            vertex_vector.push_back({position * radius + translation, {fmod(atan2f(position.y, position.x) / (2 * M_PI) + 1.0, 1.0), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
         }
     }
-    for(int i = 0; i < div / 2; i++) {
-        vertex_vector.push_back({vertex_vector[i + (div / 2) * (div + 1)].position, {0.0f, vertex_vector[i + (div / 2) * (div + 1)].color.y}});
+    for(int i = div / 2 + 1; i < div + 1; i++) {
+        vertex_vector.push_back({vertex_vector[i + (div / 2) * (div + 1)].position, {1.0f, vertex_vector[i + (div / 2) * (div + 1)].color.y}});
         correction_vertices++;
     }
     for(float i = 0; i < 8; i++) {
-        if(i != 4) {
+        if(i != 0) {
             vertex_vector.push_back({vertex_vector[(div / 2) + (div / 2) * (div + 1)].position, {i / 8, 1.0f}});
             correction_vertices++;
         }
     }
+    std::cout << vertex_vector[(div / 2) + (div / 2) * (div + 1)].color.x << "\n";
     for(int y = 0; y < div; y++) {
         for(int x = 0; x < div; x++) {
             uint32_t current_index = x + y * (div + 1);
@@ -205,14 +206,14 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
                         index_vector.push_back(current_index);
                         index_vector.push_back(current_index + 1);
                         index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(vert_per_face + correction_vertices - 3);
+                        index_vector.push_back(vert_per_face + correction_vertices - 7);
                         index_vector.push_back(current_index + div + 2);
                         index_vector.push_back(current_index + div + 1);
                     } else {
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face + correction_vertices - 1);
+                        index_vector.push_back(vert_per_face + correction_vertices - 5);
                         index_vector.push_back(current_index + div + 1);
-                        index_vector.push_back(vert_per_face + correction_vertices - 2);
+                        index_vector.push_back(vert_per_face + correction_vertices - 6);
                         index_vector.push_back(current_index + div + 2);
                         index_vector.push_back(current_index + div + 1);
                     }
@@ -220,26 +221,26 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
                     if(x == div / 2) {
                         index_vector.push_back(current_index);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(vert_per_face + correction_vertices - 5);
+                        index_vector.push_back(vert_per_face + correction_vertices - 2);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(vert_per_face + correction_vertices - 4);
+                        index_vector.push_back(vert_per_face);
+                        index_vector.push_back(vert_per_face + correction_vertices - 1);
                     } else {
                         index_vector.push_back(current_index);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(vert_per_face + correction_vertices - 6);
+                        index_vector.push_back(vert_per_face + correction_vertices - 3);
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face + correction_vertices - 7);
-                        index_vector.push_back(vert_per_face + correction_vertices - 8);
+                        index_vector.push_back(vert_per_face + correction_vertices - 4);
+                        index_vector.push_back(current_index + div + 1);
                     }
                 }
-            } else if(y == (div / 2) - 1 && x < div / 2 - 1) {
+            } else if(y == (div / 2) - 1 && x > div / 2) {
                 index_vector.push_back(current_index);
                 index_vector.push_back(current_index + 1);
-                index_vector.push_back(vert_per_face + x);
+                index_vector.push_back(vert_per_face + (x - div / 2 - 1));
                 index_vector.push_back(current_index + 1);
-                index_vector.push_back(vert_per_face + x + 1);
-                index_vector.push_back(vert_per_face + x);
+                index_vector.push_back(vert_per_face + (x - div / 2));
+                index_vector.push_back(vert_per_face + (x - div / 2 - 1));
             } else if(x == y) {
                 index_vector.push_back(current_index);
                 index_vector.push_back(current_index + 1);
@@ -264,18 +265,18 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             position.z -= 1.0f - std::max(abs(x - div / 2), abs(y - div / 2)) / div * 2;
             position = glm::normalize(position);
 
-            //position *= 1 + 0.3 * noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
+            position *= 1 + noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
 
-            vertex_vector.push_back({position * radius + translation, {atan2f(position.y, position.x) / (2 * M_PI) + 0.5f, atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
+            vertex_vector.push_back({position * radius + translation, {fmod(atan2f(position.y, position.x) / (2 * M_PI) + 1.0, 1.0), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
         }
     }
     int correction_vertices_2 = 0;
-    for(int i = 0; i < div / 2; i++) {
-        vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].position, {0.0f, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].color.y}});
+    for(int i = div / 2 + 1; i < div + 1; i++) {
+        vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].position, {1.0f, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].color.y}});
         correction_vertices_2++;
     }
     for(float i = 0; i < 8; i++) {
-        if(i != 4) {
+        if(i != 0) {
             vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)].position, {i / 8, 0.0f}});
             correction_vertices_2++;
         }
@@ -286,44 +287,44 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             if((y == div / 2 || y == div / 2 - 1) && (x == div / 2 || x == div / 2 - 1)) {
                 if(y == div / 2) {
                     if(x == div / 2) {
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(current_index + div + 2);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(current_index);
-                        index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 3);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 7);
                         index_vector.push_back(current_index + div + 1);
+                        index_vector.push_back(current_index + div + 2);
                     } else {
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 1);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 5);
                         index_vector.push_back(current_index);
                         index_vector.push_back(current_index + div + 1);
                         index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 2);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 6);
                         index_vector.push_back(current_index + div + 1);
                     }
                 } else {
                     if(x == div / 2) {
                         index_vector.push_back(current_index + 1);
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 5);
-                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 2);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 4);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 1);
                     } else {
                         index_vector.push_back(current_index + 1);
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 6);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 7);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 3);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 4);
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 8);
+                        index_vector.push_back(current_index + div + 1);
                     }
                 }
-            } else if(y == (div / 2) - 1 && x < div / 2 - 1) {
-                index_vector.push_back(current_index + 1);
+            } else if(y == (div / 2) - 1 && x > div / 2) {
                 index_vector.push_back(current_index);
-                index_vector.push_back(vert_per_face * 2 + correction_vertices + x);
-                index_vector.push_back(vert_per_face * 2 + correction_vertices + x + 1);
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + (x - div / 2 - 1));
                 index_vector.push_back(current_index + 1);
-                index_vector.push_back(vert_per_face * 2 + correction_vertices + x);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + (x - div / 2 - 1));
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + (x - div / 2));
             } else if(x == y) {
                 index_vector.push_back(current_index);
                 index_vector.push_back(current_index + div + 2);
@@ -475,6 +476,10 @@ int main() {
     bool should_close = false;
     while(!should_close) {
         glfwGetFramebufferSize(window, &width, &height);
+        if(width == 0 || height == 0) {
+            width = 16;
+            height = 16;
+        }
         glViewport(0, 0, width, height);
 
         glfwPollEvents();

@@ -197,6 +197,8 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
             double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
             double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
+            
+            position *= 1 + elev / 20;
 
             std::array<unsigned char, 4> biome = get_pixel_array(data, {clamp(floor(elev), 0.0, 11.0) * 12 + clamp(floor(humid), 0.0, 11.0), clamp(floor(temp), 0.0, 11.0)}, 144);
             
@@ -286,6 +288,8 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
             double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
             double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
+
+            position *= 1 + elev / 20;
 
             std::array<unsigned char, 4> biome = get_pixel_array(data, {clamp(floor(elev), 0.0, 11.0) * 12 + clamp(floor(humid), 0.0, 11.0), clamp(floor(temp), 0.0, 11.0)}, 144);
             

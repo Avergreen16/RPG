@@ -112,11 +112,11 @@ int main() {
 
     for(double x = 0; x < width; x++) {
         double angle = 2 * M_PI * (x / width);
-        std::array<double, 2> xy1{sin(angle), cos(angle)};
+        std::array<double, 2> xy1{cos(angle), sin(angle)};
         for(double y = 0; y < height; y++) {
             double z_angle = M_PI * (y / height - 0.5);
             double xy_magnitude = cos(z_angle);
-            std::array<double, 3> position = {xy1[0] * xy_magnitude, xy1[1] * xy_magnitude * -1, sin(z_angle) * -1}; // y and z axes inverted for consistency with coordinates in the simulation
+            std::array<double, 3> position = {xy1[0] * xy_magnitude, xy1[1] * xy_magnitude, sin(z_angle) * -1}; // z axis inverted for consistency with coordinates in the simulation
             double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
             double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
             double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
