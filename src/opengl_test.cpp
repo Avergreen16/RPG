@@ -17,32 +17,38 @@
 
 const char* v_src = R"""(
 #version 460 core
-layout(location = 0) in vec3 inpos;
+layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec2 in_texcoord;
+layout(location = 2) in vec3 in_normal;
 
-uniform mat4 trans_mat;
-uniform mat4 proj_mat;
-uniform mat4 view_mat;
+layout(location = 0) uniform mat4 trans_mat;
+layout(location = 1) uniform mat4 view_mat;
+layout(location = 2) uniform mat4 proj_mat;
 
 out vec2 f_texcoord;
+out vec3 f_normal;
 
 void main() {
-    gl_Position = proj_mat * view_mat * (trans_mat * vec4(inpos, 1.0));
+    gl_Position = proj_mat * view_mat * (trans_mat * vec4(in_pos, 1.0));
     f_texcoord = in_texcoord;
+    f_normal = in_normal;
 }
 )""";
 
 const char* f_src = R"""(
 #version 460 core
+layout(location = 3) uniform vec3 light_source_rel_pos;
 
 in vec2 f_texcoord;
+in vec3 f_normal;
 
 uniform sampler2D input_texture;
 
 out vec4 FragColor;
 
 void main() {
-    FragColor = texture(input_texture, f_texcoord);
+    float dotproduct = dot(f_normal, normalize(light_source_rel_pos));
+    FragColor = vec4(texture(input_texture, f_texcoord).xyz * min(max((dotproduct * 12.0), 0.125), 1.0), 1.0);
 }
 )""";
 
@@ -79,12 +85,18 @@ GLuint create_shader(const char* vertex_shader, const char* fragment_shader) {
     return shader;
 }
 
+glm::vec3 up(0.0f, 0.0f, 1.0f);
+glm::mat4 identity = glm::identity<glm::mat4>();
+
 float dist = 200.0f;
 float xdeg = 0.0f;
 float zdeg = 0.0f;
 glm::vec3 camera_dir(1.0f, 0.0f, 0.0f);
 glm::vec3 camera_pos(-20.0f, -20.0f, 0.0f);
 glm::vec2 move_dir(0.0f, -1.0f);
+glm::vec3 up_dir = glm::normalize(camera_pos);
+
+glm::mat4 player_matrix = glm::rotate(identity, glm::radians(glm::acos(glm::dot(up_dir, up))), glm::cross(up_dir, up));
 
 std::map<int, bool> user_input_array = {
     {GLFW_KEY_W, false},
@@ -151,6 +163,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 struct Vertex {
     glm::vec3 position;
     glm::vec2 color;
+    glm::vec3 normal;
 };
 
 std::vector<Vertex> vertex_vector;
@@ -166,12 +179,13 @@ unsigned int load_texture(char address[], std::array<int, 3> &info) {
 
     unsigned char *data = stbi_load(address, &info[0], &info[1], &info[2], 0); 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, info[0], info[1], 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    stbi_image_free(data);
     glGenerateMipmap(GL_TEXTURE_2D);
     
     return texture_id;
 }
 
-void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, float radius, const int div, siv::PerlinNoise& noise, glm::vec3 translation) {
+void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, float radius, const int div, siv::PerlinNoise& noise) {
     int vert_per_face = (div + 1) * (div + 1);
 
     int correction_vertices = 0;
@@ -181,18 +195,18 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             position.z += 1.0f - std::max(abs(x - div / 2), abs(y - div / 2)) / div * 2;
             position = glm::normalize(position);
 
-            position *= 1 + noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
+            //position *= 1 + noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
             
-            vertex_vector.push_back({position * radius + translation, {fmod(atan2f(position.y, position.x) / (2 * M_PI) + 1.0, 1.0), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
+            vertex_vector.push_back({position * radius, {fmod(atan2f(position.y, position.x) / (2 * M_PI) + 1.0, 1.0), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}, position});
         }
     }
     for(int i = div / 2 + 1; i < div + 1; i++) {
-        vertex_vector.push_back({vertex_vector[i + (div / 2) * (div + 1)].position, {1.0f, vertex_vector[i + (div / 2) * (div + 1)].color.y}});
+        vertex_vector.push_back({vertex_vector[i + (div / 2) * (div + 1)].position, {1.0f, vertex_vector[i + (div / 2) * (div + 1)].color.y}, vertex_vector[i + (div / 2) * (div + 1)].normal});
         correction_vertices++;
     }
     for(float i = 0; i < 8; i++) {
         if(i != 0) {
-            vertex_vector.push_back({vertex_vector[(div / 2) + (div / 2) * (div + 1)].position, {i / 8, 1.0f}});
+            vertex_vector.push_back({vertex_vector[(div / 2) + (div / 2) * (div + 1)].position, {i / 8, 1.0f}, vertex_vector[(div / 2) + (div / 2) * (div + 1)].normal});
             correction_vertices++;
         }
     }
@@ -265,19 +279,19 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             position.z -= 1.0f - std::max(abs(x - div / 2), abs(y - div / 2)) / div * 2;
             position = glm::normalize(position);
 
-            position *= 1 + noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
+            //position *= 1 + noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
 
-            vertex_vector.push_back({position * radius + translation, {fmod(atan2f(position.y, position.x) / (2 * M_PI) + 1.0, 1.0), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}});
+            vertex_vector.push_back({position * radius, {fmod(atan2f(position.y, position.x) / (2 * M_PI) + 1.0, 1.0), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}, position});
         }
     }
     int correction_vertices_2 = 0;
     for(int i = div / 2 + 1; i < div + 1; i++) {
-        vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].position, {1.0f, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].color.y}});
+        vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].position, {1.0f, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].color.y}, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].normal});
         correction_vertices_2++;
     }
     for(float i = 0; i < 8; i++) {
         if(i != 0) {
-            vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)].position, {i / 8, 0.0f}});
+            vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)].position, {i / 8, 0.0f}, vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)].normal});
             correction_vertices_2++;
         }
     }
@@ -349,7 +363,7 @@ int main() {
     glfwInit();
 
     siv::PerlinNoise noise(4097);
-    generate_sphere(vertex_vector, index_vector, 1.0f, 80, noise, {0.0f, 0.0f, 0.0f});
+    generate_sphere(vertex_vector, index_vector, 1.0f, 80, noise);
 
     GLFWwindow* window = glfwCreateWindow(width, height, "test", NULL, NULL);
     glfwMakeContextCurrent(window);
@@ -370,6 +384,8 @@ int main() {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 5));
+    glEnableVertexAttribArray(2);
 
     GLuint ebo_id;
     glCreateBuffers(1, &ebo_id);
@@ -454,10 +470,10 @@ int main() {
     glm::vec3 scale(16.0f, 16.0f, 16.0f);
     float rotation = 0.0f;
     glm::vec3 position(0.0f, 0.0f, 0.0f);
-    glm::vec3 rot_axis(0.3f, 1.0f, 0.0f);
+    glm::vec3 rot_axis(0.0f, 0.0f, 1.0f);
 
     glm::vec3 scale_2(190.0f, 190.0f, 190.0f);
-    float rotation_2 = 16.0f;
+    float rotation_2 = 180.0f;
     glm::vec3 position_2(800.0f, 200.0f, 20.0f);
 
     glm::vec3 scale_3(1400.0f, 1400.0f, 1400.0f);
@@ -510,14 +526,18 @@ int main() {
             move_vector *= 0.1f;
         }
 
-        camera_pos += glm::vec3(move_vector, 0.0f);
+        camera_pos += glm::vec3(glm::vec4(move_vector, 0.0f, 0.0f) * player_matrix);
 
         if(user_input_array[GLFW_KEY_SPACE]) {
-            camera_pos.z += 0.1f;
+            camera_pos += up_dir * 0.1f;
         }
         if(user_input_array[GLFW_KEY_LEFT_SHIFT]) {
-            camera_pos.z -= 0.1f;
+            camera_pos -= up_dir * 0.1f;
         }
+
+        up_dir = glm::normalize(camera_pos);
+
+        player_matrix = glm::rotate(identity, glm::radians(glm::acos(glm::dot(up_dir, up))), glm::cross(up_dir, up));
         
         //glClearColor(0.2, 0.2, 0.2, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -539,9 +559,8 @@ int main() {
         transform_matrix_3 = glm::rotate(transform_matrix_3, glm::radians(rotation_3), rot_axis);
         transform_matrix_3 = glm::scale(transform_matrix_3, scale_3);
 
-        glm::vec3 center = camera_pos + camera_dir;
-        glm::vec3 up(0.0f, 0.0f, 1.0f);
-        glm::mat4 view_matrix = glm::lookAt(camera_pos, center, up);
+        glm::vec3 center = camera_pos + glm::vec3(glm::vec4(camera_dir, 1.0f) * player_matrix);
+        glm::mat4 view_matrix = glm::lookAt(camera_pos, center, up_dir);
 
         /*float projection_width = width;
         float projection_height = height;
@@ -562,9 +581,10 @@ int main() {
 
         glBindTexture(GL_TEXTURE_2D, planet_texture);
 
-        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniform3fv(3, 1, &position_3[0]);
 
         //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -577,20 +597,26 @@ int main() {
         glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
         glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);*/
+        glm::mat4 rot = glm::rotate(identity, glm::radians(-rotation_2), rot_axis);
+        glm::vec3 gas_giant_light_source = glm::vec4(position_3, 1.0) * glm::inverse(transform_matrix_2);
+        glm::vec3 sun_light_source = -position_3;
+
         glBindTexture(GL_TEXTURE_2D, gas_giant_texture);
 
-        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix_2[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix_2[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniform3fv(3, 1, &gas_giant_light_source[0]);
         
         glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
 
 
         glBindTexture(GL_TEXTURE_2D, sun_texture);
 
-        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix_3[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix_3[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniform3fv(3, 1, &sun_light_source[0]);
         
         glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
 
