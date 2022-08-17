@@ -17,32 +17,38 @@
 
 const char* v_src = R"""(
 #version 460 core
-layout(location = 0) in vec3 inpos;
-layout(location = 1) in vec3 in_texcoord;
+layout(location = 0) in vec3 in_pos;
+layout(location = 1) in vec2 in_texcoord;
+layout(location = 2) in vec3 in_normal;
 
-uniform mat4 trans_mat;
-uniform mat4 proj_mat;
-uniform mat4 view_mat;
+layout(location = 0) uniform mat4 trans_mat;
+layout(location = 1) uniform mat4 view_mat;
+layout(location = 2) uniform mat4 proj_mat;
 
-out vec3 f_texcoord;
+out vec2 f_texcoord;
+out vec3 f_normal;
 
 void main() {
-    gl_Position = proj_mat * view_mat * (trans_mat * vec4(inpos, 1.0));
+    gl_Position = proj_mat * view_mat * (trans_mat * vec4(in_pos, 1.0));
     f_texcoord = in_texcoord;
+    f_normal = in_normal;
 }
 )""";
 
 const char* f_src = R"""(
 #version 460 core
+layout(location = 3) uniform vec3 light_source_rel_pos;
 
-in vec3 f_texcoord;
+in vec2 f_texcoord;
+in vec3 f_normal;
 
 uniform sampler2D input_texture;
 
 out vec4 FragColor;
 
 void main() {
-    FragColor = vec4(f_texcoord, 1.0);//texture(input_texture, f_texcoord);
+    float dotproduct = dot(f_normal, normalize(light_source_rel_pos));
+    FragColor = vec4(texture(input_texture, f_texcoord).xyz * min(max((dotproduct * 12.0), 0.125), 1.0), 1.0);
 }
 )""";
 
@@ -79,12 +85,18 @@ GLuint create_shader(const char* vertex_shader, const char* fragment_shader) {
     return shader;
 }
 
+glm::vec3 up(0.0f, 0.0f, 1.0f);
+glm::mat4 identity = glm::identity<glm::mat4>();
+
 float dist = 200.0f;
 float xdeg = 0.0f;
 float zdeg = 0.0f;
 glm::vec3 camera_dir(1.0f, 0.0f, 0.0f);
 glm::vec3 camera_pos(-20.0f, -20.0f, 0.0f);
 glm::vec2 move_dir(0.0f, -1.0f);
+glm::vec3 up_dir = glm::normalize(camera_pos);
+
+glm::mat3 player_matrix = glm::mat3(up_dir.z, up_dir.x, up_dir.y, up_dir.y, up_dir.z, up_dir.x, up_dir.x, up_dir.y, up_dir.z);
 
 std::map<int, bool> user_input_array = {
     {GLFW_KEY_W, false},
@@ -150,7 +162,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 struct Vertex {
     glm::vec3 position;
-    glm::vec3 color;
+    glm::vec2 color;
+    glm::vec3 normal;
 };
 
 std::vector<Vertex> vertex_vector;
@@ -166,22 +179,13 @@ unsigned int load_texture(char address[], std::array<int, 3> &info) {
 
     unsigned char *data = stbi_load(address, &info[0], &info[1], &info[2], 0); 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, info[0], info[1], 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    stbi_image_free(data);
     glGenerateMipmap(GL_TEXTURE_2D);
     
     return texture_id;
 }
 
-std::array<unsigned char, 4> get_pixel_array(unsigned char* data, std::array<int, 2> pixel, int image_width) {
-    int pixel_index = pixel[0] + pixel[1] * image_width;
-    return {data[pixel_index * 4], data[pixel_index * 4 + 1], data[pixel_index * 4 + 2], data[pixel_index * 4 + 3]};
-}
-
-template<typename type>
-type clamp(type x, type min, type max) {
-    return std::min(std::max(x, min), max);
-}
-
-void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, float radius, const int div, std::array<siv::PerlinNoise, 3>& noise, glm::vec3 translation, unsigned char* data) {
+void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, float radius, const int div, siv::PerlinNoise& noise) {
     int vert_per_face = (div + 1) * (div + 1);
 
     int correction_vertices = 0;
@@ -190,31 +194,23 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             glm::vec3 position(-1.0f + x / div * 2.0f, -1.0f + y / div * 2.0f, 0.0f);
             position.z += 1.0f - std::max(abs(x - div / 2), abs(y - div / 2)) / div * 2;
             position = glm::normalize(position);
-            //double noise_val = noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
-            //if(noise_val > 0.2) position *= 1 + 0.3 * noise_val;
 
-            double z_angle = atan(position.z / hypot(position.x, position.y));
-            double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
-            double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
-            double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
+            //position *= 1 + noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
             
-            position *= 1 + elev / 20;
-
-            std::array<unsigned char, 4> biome = get_pixel_array(data, {clamp(floor(elev), 0.0, 11.0) * 12 + clamp(floor(humid), 0.0, 11.0), clamp(floor(temp), 0.0, 11.0)}, 144);
-            
-            vertex_vector.push_back({position * radius + translation, {float(biome[0]) / 255, float(biome[1]) / 255, float(biome[2]) / 255}});
+            vertex_vector.push_back({position * radius, {fmod(atan2f(position.y, position.x) / (2 * M_PI) + 1.0, 1.0), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}, position});
         }
     }
-    for(int i = 0; i < div / 2; i++) {
-        vertex_vector.push_back(vertex_vector[i + (div / 2) * (div + 1)]);
+    for(int i = div / 2 + 1; i < div + 1; i++) {
+        vertex_vector.push_back({vertex_vector[i + (div / 2) * (div + 1)].position, {1.0f, vertex_vector[i + (div / 2) * (div + 1)].color.y}, vertex_vector[i + (div / 2) * (div + 1)].normal});
         correction_vertices++;
     }
     for(float i = 0; i < 8; i++) {
-        if(i != 4) {
-            vertex_vector.push_back(vertex_vector[(div / 2) + (div / 2) * (div + 1)]);
+        if(i != 0) {
+            vertex_vector.push_back({vertex_vector[(div / 2) + (div / 2) * (div + 1)].position, {i / 8, 1.0f}, vertex_vector[(div / 2) + (div / 2) * (div + 1)].normal});
             correction_vertices++;
         }
     }
+    std::cout << vertex_vector[(div / 2) + (div / 2) * (div + 1)].color.x << "\n";
     for(int y = 0; y < div; y++) {
         for(int x = 0; x < div; x++) {
             uint32_t current_index = x + y * (div + 1);
@@ -224,14 +220,14 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
                         index_vector.push_back(current_index);
                         index_vector.push_back(current_index + 1);
                         index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(vert_per_face + correction_vertices - 3);
+                        index_vector.push_back(vert_per_face + correction_vertices - 7);
                         index_vector.push_back(current_index + div + 2);
                         index_vector.push_back(current_index + div + 1);
                     } else {
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face + correction_vertices - 1);
+                        index_vector.push_back(vert_per_face + correction_vertices - 5);
                         index_vector.push_back(current_index + div + 1);
-                        index_vector.push_back(vert_per_face + correction_vertices - 2);
+                        index_vector.push_back(vert_per_face + correction_vertices - 6);
                         index_vector.push_back(current_index + div + 2);
                         index_vector.push_back(current_index + div + 1);
                     }
@@ -239,26 +235,26 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
                     if(x == div / 2) {
                         index_vector.push_back(current_index);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(vert_per_face + correction_vertices - 5);
+                        index_vector.push_back(vert_per_face + correction_vertices - 2);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(vert_per_face + correction_vertices - 4);
+                        index_vector.push_back(vert_per_face);
+                        index_vector.push_back(vert_per_face + correction_vertices - 1);
                     } else {
                         index_vector.push_back(current_index);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(vert_per_face + correction_vertices - 6);
+                        index_vector.push_back(vert_per_face + correction_vertices - 3);
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face + correction_vertices - 7);
-                        index_vector.push_back(vert_per_face + correction_vertices - 8);
+                        index_vector.push_back(vert_per_face + correction_vertices - 4);
+                        index_vector.push_back(current_index + div + 1);
                     }
                 }
-            } else if(y == (div / 2) - 1 && x < div / 2 - 1) {
+            } else if(y == (div / 2) - 1 && x > div / 2) {
                 index_vector.push_back(current_index);
                 index_vector.push_back(current_index + 1);
-                index_vector.push_back(vert_per_face + x);
+                index_vector.push_back(vert_per_face + (x - div / 2 - 1));
                 index_vector.push_back(current_index + 1);
-                index_vector.push_back(vert_per_face + x + 1);
-                index_vector.push_back(vert_per_face + x);
+                index_vector.push_back(vert_per_face + (x - div / 2));
+                index_vector.push_back(vert_per_face + (x - div / 2 - 1));
             } else if(x == y) {
                 index_vector.push_back(current_index);
                 index_vector.push_back(current_index + 1);
@@ -283,27 +279,19 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             position.z -= 1.0f - std::max(abs(x - div / 2), abs(y - div / 2)) / div * 2;
             position = glm::normalize(position);
 
-            //position *= 1 + 0.3 * noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
-            double z_angle = atan(position.z / hypot(position.x, position.y));
-            double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
-            double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
-            double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
+            //position *= 1 + noise.normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6);
 
-            position *= 1 + elev / 20;
-
-            std::array<unsigned char, 4> biome = get_pixel_array(data, {clamp(floor(elev), 0.0, 11.0) * 12 + clamp(floor(humid), 0.0, 11.0), clamp(floor(temp), 0.0, 11.0)}, 144);
-            
-            vertex_vector.push_back({position * radius + translation, {float(biome[0]) / 255, float(biome[1]) / 255, float(biome[2]) / 255}});
+            vertex_vector.push_back({position * radius, {fmod(atan2f(position.y, position.x) / (2 * M_PI) + 1.0, 1.0), atanf(position.z / hypot(position.x, position.y)) / M_PI + 0.5f}, position});
         }
     }
     int correction_vertices_2 = 0;
-    for(int i = 0; i < div / 2; i++) {
-        vertex_vector.push_back(vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)]);
+    for(int i = div / 2 + 1; i < div + 1; i++) {
+        vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].position, {1.0f, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].color.y}, vertex_vector[vert_per_face + correction_vertices + i + (div / 2) * (div + 1)].normal});
         correction_vertices_2++;
     }
     for(float i = 0; i < 8; i++) {
-        if(i != 4) {
-            vertex_vector.push_back(vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)]);
+        if(i != 0) {
+            vertex_vector.push_back({vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)].position, {i / 8, 0.0f}, vertex_vector[vert_per_face + correction_vertices + (div / 2) + (div / 2) * (div + 1)].normal});
             correction_vertices_2++;
         }
     }
@@ -313,44 +301,44 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
             if((y == div / 2 || y == div / 2 - 1) && (x == div / 2 || x == div / 2 - 1)) {
                 if(y == div / 2) {
                     if(x == div / 2) {
+                        index_vector.push_back(current_index);
+                        index_vector.push_back(current_index + div + 2);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(current_index);
-                        index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 3);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 7);
                         index_vector.push_back(current_index + div + 1);
+                        index_vector.push_back(current_index + div + 2);
                     } else {
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 1);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 5);
                         index_vector.push_back(current_index);
                         index_vector.push_back(current_index + div + 1);
                         index_vector.push_back(current_index + div + 2);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 2);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 6);
                         index_vector.push_back(current_index + div + 1);
                     }
                 } else {
                     if(x == div / 2) {
                         index_vector.push_back(current_index + 1);
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 5);
-                        index_vector.push_back(current_index + div + 2);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 2);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices);
                         index_vector.push_back(current_index + 1);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 4);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 1);
                     } else {
                         index_vector.push_back(current_index + 1);
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 6);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 7);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 3);
+                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 4);
                         index_vector.push_back(current_index);
-                        index_vector.push_back(vert_per_face * 2 + correction_vertices + correction_vertices_2 - 8);
+                        index_vector.push_back(current_index + div + 1);
                     }
                 }
-            } else if(y == (div / 2) - 1 && x < div / 2 - 1) {
-                index_vector.push_back(current_index + 1);
+            } else if(y == (div / 2) - 1 && x > div / 2) {
                 index_vector.push_back(current_index);
-                index_vector.push_back(vert_per_face * 2 + correction_vertices + x);
-                index_vector.push_back(vert_per_face * 2 + correction_vertices + x + 1);
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + (x - div / 2 - 1));
                 index_vector.push_back(current_index + 1);
-                index_vector.push_back(vert_per_face * 2 + correction_vertices + x);
+                index_vector.push_back(current_index + 1);
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + (x - div / 2 - 1));
+                index_vector.push_back(vert_per_face * 2 + correction_vertices + (x - div / 2));
             } else if(x == y) {
                 index_vector.push_back(current_index);
                 index_vector.push_back(current_index + div + 2);
@@ -374,11 +362,8 @@ int main() {
     int width = 1000, height = 600;
     glfwInit();
 
-    std::array<int, 3> info;
-    unsigned char* data = stbi_load("biome_map_t0.png", &info[0], &info[1], &info[2], 4);
-
-    std::array<siv::PerlinNoise, 3> noise{siv::PerlinNoise(4097), siv::PerlinNoise(4098), siv::PerlinNoise(4099)};
-    generate_sphere(vertex_vector, index_vector, 1.0f, 80, noise, {0.0f, 0.0f, 0.0f}, data);
+    siv::PerlinNoise noise(4097);
+    generate_sphere(vertex_vector, index_vector, 1.0f, 80, noise);
 
     GLFWwindow* window = glfwCreateWindow(width, height, "test", NULL, NULL);
     glfwMakeContextCurrent(window);
@@ -397,8 +382,10 @@ int main() {
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 5));
+    glEnableVertexAttribArray(2);
 
     GLuint ebo_id;
     glCreateBuffers(1, &ebo_id);
@@ -483,15 +470,15 @@ int main() {
     glm::vec3 scale(16.0f, 16.0f, 16.0f);
     float rotation = 0.0f;
     glm::vec3 position(0.0f, 0.0f, 0.0f);
-    glm::vec3 rot_axis(0.3f, 1.0f, 0.0f);
+    glm::vec3 rot_axis(0.0f, 0.0f, 1.0f);
 
-    glm::vec3 scale_2(190.0f, 190.0f, 190.0f);
-    float rotation_2 = 16.0f;
-    glm::vec3 position_2(800.0f, 200.0f, 20.0f);
+    glm::vec3 scale_2(70.0f, 70.0f, 70.0f);
+    float rotation_2 = 180.0f;
+    glm::vec3 position_2(300.0f, 100.0f, 20.0f);
 
     glm::vec3 scale_3(1400.0f, 1400.0f, 1400.0f);
     float rotation_3 = 0.0f;
-    glm::vec3 position_3(30000.0f, 25000.0f, -600.0f);
+    glm::vec3 position_3(-30000.0f, 25000.0f, -600.0f);
 
     stbi_set_flip_vertically_on_load(1);
 
@@ -505,6 +492,10 @@ int main() {
     bool should_close = false;
     while(!should_close) {
         glfwGetFramebufferSize(window, &width, &height);
+        if(width == 0 || height == 0) {
+            width = 16;
+            height = 16;
+        }
         glViewport(0, 0, width, height);
 
         glfwPollEvents();
@@ -535,14 +526,22 @@ int main() {
             move_vector *= 0.1f;
         }
 
-        camera_pos += glm::vec3(move_vector, 0.0f);
+        camera_pos += player_matrix * glm::vec3(move_vector, 0.0f);
 
         if(user_input_array[GLFW_KEY_SPACE]) {
-            camera_pos.z += 0.1f;
+            camera_pos += up_dir * 0.1f;
         }
         if(user_input_array[GLFW_KEY_LEFT_SHIFT]) {
-            camera_pos.z -= 0.1f;
+            camera_pos -= up_dir * 0.1f;
         }
+
+        up_dir = glm::normalize(camera_pos);
+
+        glm::vec3 vec_0 = glm::normalize(glm::cross(up, up_dir));
+
+        glm::vec3 vec_1 = glm::normalize(glm::cross(up_dir, vec_0));
+
+        player_matrix = glm::mat3(vec_1, -vec_0, up_dir);
         
         //glClearColor(0.2, 0.2, 0.2, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -564,9 +563,8 @@ int main() {
         transform_matrix_3 = glm::rotate(transform_matrix_3, glm::radians(rotation_3), rot_axis);
         transform_matrix_3 = glm::scale(transform_matrix_3, scale_3);
 
-        glm::vec3 center = camera_pos + camera_dir;
-        glm::vec3 up(0.0f, 0.0f, 1.0f);
-        glm::mat4 view_matrix = glm::lookAt(camera_pos, center, up);
+        glm::vec3 center = camera_pos + player_matrix * camera_dir;
+        glm::mat4 view_matrix = glm::lookAt(camera_pos, center, up_dir);
 
         /*float projection_width = width;
         float projection_height = height;
@@ -587,9 +585,10 @@ int main() {
 
         glBindTexture(GL_TEXTURE_2D, planet_texture);
 
-        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniform3fv(3, 1, &position_3[0]);
 
         //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -602,20 +601,26 @@ int main() {
         glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
         glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);*/
+        glm::mat4 rot = glm::rotate(identity, glm::radians(-rotation_2), rot_axis);
+        glm::vec3 gas_giant_light_source = glm::vec4(position_3, 1.0) * glm::inverse(transform_matrix_2);
+        glm::vec3 sun_light_source = -position_3;
+
         glBindTexture(GL_TEXTURE_2D, gas_giant_texture);
 
-        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix_2[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix_2[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniform3fv(3, 1, &gas_giant_light_source[0]);
         
         glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
 
 
         glBindTexture(GL_TEXTURE_2D, sun_texture);
 
-        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix_3[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix_3[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
+        glUniform3fv(3, 1, &sun_light_source[0]);
         
         glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
 

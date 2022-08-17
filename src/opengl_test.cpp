@@ -3,6 +3,7 @@
 #include <array>
 #include <iostream>
 #include <map>
+#include <chrono>
 
 #define GLFW_INCLUDE_NONE
 #include <glfw\glfw3.h>
@@ -21,15 +22,13 @@ layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec2 in_texcoord;
 layout(location = 2) in vec3 in_normal;
 
-layout(location = 0) uniform mat4 trans_mat;
-layout(location = 1) uniform mat4 view_mat;
-layout(location = 2) uniform mat4 proj_mat;
+layout(location = 0) uniform mat4 matrix;
 
 out vec2 f_texcoord;
 out vec3 f_normal;
 
 void main() {
-    gl_Position = proj_mat * view_mat * (trans_mat * vec4(in_pos, 1.0));
+    gl_Position = matrix * vec4(in_pos, 1.0);
     f_texcoord = in_texcoord;
     f_normal = in_normal;
 }
@@ -37,7 +36,7 @@ void main() {
 
 const char* f_src = R"""(
 #version 460 core
-layout(location = 3) uniform vec3 light_source_rel_pos;
+layout(location = 1) uniform vec3 light_source_rel_pos;
 
 in vec2 f_texcoord;
 in vec3 f_normal;
@@ -66,6 +65,10 @@ void main() {
 }
 )""";
 
+time_t __attribute__((always_inline)) get_time() {
+    return std::chrono::steady_clock::now().time_since_epoch().count();
+}
+
 GLuint create_shader(const char* vertex_shader, const char* fragment_shader) {
     GLuint v_shader = glCreateShader(GL_VERTEX_SHADER);
     GLuint f_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -88,15 +91,12 @@ GLuint create_shader(const char* vertex_shader, const char* fragment_shader) {
 glm::vec3 up(0.0f, 0.0f, 1.0f);
 glm::mat4 identity = glm::identity<glm::mat4>();
 
-float dist = 200.0f;
 float xdeg = 0.0f;
 float zdeg = 0.0f;
 glm::vec3 camera_dir(1.0f, 0.0f, 0.0f);
-glm::vec3 camera_pos(-20.0f, -20.0f, 0.0f);
+glm::vec3 camera_pos(40000.0f, 0.0f, 300.0f);
 glm::vec2 move_dir(0.0f, -1.0f);
 glm::vec3 up_dir = glm::normalize(camera_pos);
-
-glm::mat4 player_matrix = glm::rotate(identity, glm::radians(glm::acos(glm::dot(up_dir, up))), glm::cross(up_dir, up));
 
 std::map<int, bool> user_input_array = {
     {GLFW_KEY_W, false},
@@ -107,11 +107,6 @@ std::map<int, bool> user_input_array = {
     {GLFW_KEY_LEFT_SHIFT, false},
     {GLFW_MOUSE_BUTTON_LEFT, false}
 };
-
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    if(yoffset > 0) dist /= 1.2f;
-    else dist *= 1.2f;
-}
 
 void update_camera_dir() {
     float temp_x = cos(glm::radians(xdeg));
@@ -157,6 +152,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
     } else if(action == GLFW_RELEASE) {
        if(user_input_array.find(key) != user_input_array.end()) user_input_array[key] = false;
+    }
+}
+
+float speed = 48.0f;
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    if(yoffset > 0) {
+        speed *= 1.5;
+    } else if(yoffset < 0) {
+        speed /= 1.5;
     }
 }
 
@@ -358,12 +362,44 @@ void generate_sphere(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& 
     }
 }
 
+struct Sphere {
+    glm::vec3 pos;
+    float radius;
+    GLuint surface_texture;
+    glm::vec3 light_source;
+    
+    Sphere(glm::vec3 pos, float radius, GLuint surface_texture, glm::vec3 light_source) {
+        this->pos = pos;
+        this->radius = radius;
+        this->surface_texture = surface_texture;
+        this->light_source = light_source;
+    }
+
+    void render(glm::mat4 pers_view_mat, GLuint program) {
+        glm::mat4 trans_mat = identity;
+        trans_mat = glm::translate(trans_mat, pos);
+
+        glm::vec3 scale(radius, radius, radius);
+        trans_mat = glm::scale(trans_mat, scale);
+
+        glUseProgram(program);
+        glBindTexture(GL_TEXTURE_2D, surface_texture);
+        
+        glm::mat4 render_matrix = pers_view_mat * trans_mat;
+        glm::vec3 rel_light_source = (light_source - pos);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &render_matrix[0][0]);
+        glUniform3fv(1, 1, &rel_light_source[0]);
+
+        glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
+    }
+};
+
 int main() {
     int width = 1000, height = 600;
     glfwInit();
 
     siv::PerlinNoise noise(4097);
-    generate_sphere(vertex_vector, index_vector, 1.0f, 80, noise);
+    generate_sphere(vertex_vector, index_vector, 1.0f, 32, noise);
 
     GLFWwindow* window = glfwCreateWindow(width, height, "test", NULL, NULL);
     glfwMakeContextCurrent(window);
@@ -467,30 +503,31 @@ int main() {
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetKeyCallback(window, key_callback);
 
-    glm::vec3 scale(16.0f, 16.0f, 16.0f);
-    float rotation = 0.0f;
-    glm::vec3 position(0.0f, 0.0f, 0.0f);
-    glm::vec3 rot_axis(0.0f, 0.0f, 1.0f);
-
-    glm::vec3 scale_2(190.0f, 190.0f, 190.0f);
-    float rotation_2 = 180.0f;
-    glm::vec3 position_2(800.0f, 200.0f, 20.0f);
-
-    glm::vec3 scale_3(1400.0f, 1400.0f, 1400.0f);
-    float rotation_3 = 0.0f;
-    glm::vec3 position_3(30000.0f, 25000.0f, -600.0f);
-
     stbi_set_flip_vertically_on_load(1);
 
     std::array<int, 3> data_array;
-    GLuint planet_texture = load_texture("res\\planets\\terra.png", data_array);
-    GLuint gas_giant_texture = load_texture("res\\planets\\gasgiant.png", data_array);
+    GLuint terra_texture = load_texture("res\\planets\\terra.png", data_array);
+    GLuint gas_giant0_texture = load_texture("res\\planets\\gasgiant0.png", data_array);
     GLuint sun_texture = load_texture("res\\planets\\sun.png", data_array);
+    GLuint shafur_texture = load_texture("res\\planets\\shafur.png", data_array);
+    GLuint gas_giant1_texture = load_texture("res\\planets\\gasgiant1.png", data_array);
 
     glPolygonMode(GL_BACK, GL_LINE);
 
+    Sphere sun({0.0f, 0.0f, 0.0f}, 1400.0f, sun_texture, {20400.0f, 400.0f, 195.0f});
+    Sphere gas_giant({40000.0f, 200.0f, 200.0f}, 120.0f, gas_giant0_texture, sun.pos);
+    Sphere terra({40400.0f, 400.0f, 195.0f}, 12.0f, terra_texture, sun.pos);
+    Sphere ice_giant({-1000.0f, 3000.0f, 100.0f}, 150.0f, gas_giant1_texture, sun.pos);
+    Sphere shafur({40600.0f, -300.0f, 205.0f}, 10.0f, shafur_texture, sun.pos);
+
+    time_t start_time = get_time();
+
     bool should_close = false;
     while(!should_close) {
+        time_t current_time = get_time();
+        uint32_t delta_time = current_time - start_time;
+        start_time = current_time;
+
         glfwGetFramebufferSize(window, &width, &height);
         if(width == 0 || height == 0) {
             width = 16;
@@ -520,47 +557,29 @@ int main() {
         }
 
         if(!(move_vector.x == 0.0f && move_vector.y == 0.0f)) move_vector = glm::normalize(move_vector);
+        float movement_factor = speed * (double(delta_time) / 1000000000);
         if(user_input_array[GLFW_KEY_LEFT_CONTROL]) {
-            move_vector *= 0.25;
+            move_vector *= movement_factor;
         } else {
-            move_vector *= 0.1f;
+            move_vector *= movement_factor;
         }
 
-        camera_pos += glm::vec3(glm::vec4(move_vector, 0.0f, 0.0f) * player_matrix);
+        camera_pos += glm::vec3(move_vector, 0.0f);
 
         if(user_input_array[GLFW_KEY_SPACE]) {
-            camera_pos += up_dir * 0.1f;
+            camera_pos.z += movement_factor;
         }
         if(user_input_array[GLFW_KEY_LEFT_SHIFT]) {
-            camera_pos -= up_dir * 0.1f;
+            camera_pos.z -= movement_factor;
         }
-
-        up_dir = glm::normalize(camera_pos);
-
-        player_matrix = glm::rotate(identity, glm::radians(glm::acos(glm::dot(up_dir, up))), glm::cross(up_dir, up));
         
         //glClearColor(0.2, 0.2, 0.2, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         glBindVertexArray(vao_id);
 
-        glm::mat4 transform_matrix = glm::identity<glm::mat4>();
-        transform_matrix = glm::translate(transform_matrix, position);
-        transform_matrix = glm::rotate(transform_matrix, glm::radians(rotation), rot_axis);
-        transform_matrix = glm::scale(transform_matrix, scale);
-
-        glm::mat4 transform_matrix_2 = glm::identity<glm::mat4>();
-        transform_matrix_2 = glm::translate(transform_matrix_2, position_2);
-        transform_matrix_2 = glm::rotate(transform_matrix_2, glm::radians(rotation_2), rot_axis);
-        transform_matrix_2 = glm::scale(transform_matrix_2, scale_2);
-
-        glm::mat4 transform_matrix_3 = glm::identity<glm::mat4>();
-        transform_matrix_3 = glm::translate(transform_matrix_3, position_3);
-        transform_matrix_3 = glm::rotate(transform_matrix_3, glm::radians(rotation_3), rot_axis);
-        transform_matrix_3 = glm::scale(transform_matrix_3, scale_3);
-
-        glm::vec3 center = camera_pos + glm::vec3(glm::vec4(camera_dir, 1.0f) * player_matrix);
-        glm::mat4 view_matrix = glm::lookAt(camera_pos, center, up_dir);
+        glm::vec3 center = camera_pos + camera_dir;
+        glm::mat4 view_matrix = glm::lookAt(camera_pos, center, up);
 
         /*float projection_width = width;
         float projection_height = height;
@@ -577,48 +596,15 @@ int main() {
 
         glm::mat4 projection_matrix = glm::perspective(45.0f, float(width) / height, near, far);//glm::ortho(left, right, bottom, top, near, far);
 
-        glUseProgram(program);
+        glm::mat4 proj_view_mat = projection_matrix * view_matrix;
 
-        glBindTexture(GL_TEXTURE_2D, planet_texture);
+        sun.light_source = camera_pos;
 
-        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix[0][0]);
-        glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
-        glUniform3fv(3, 1, &position_3[0]);
-
-        //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-        glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
-
-        /*glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-        glUseProgram(outline_shader);
-
-        glUniformMatrix4fv(2, 1, GL_FALSE, &transform_matrix[0][0]);
-        glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(0, 1, GL_FALSE, &projection_matrix[0][0]);*/
-        glm::mat4 rot = glm::rotate(identity, glm::radians(-rotation_2), rot_axis);
-        glm::vec3 gas_giant_light_source = glm::vec4(position_3, 1.0) * glm::inverse(transform_matrix_2);
-        glm::vec3 sun_light_source = -position_3;
-
-        glBindTexture(GL_TEXTURE_2D, gas_giant_texture);
-
-        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix_2[0][0]);
-        glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
-        glUniform3fv(3, 1, &gas_giant_light_source[0]);
-        
-        glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
-
-
-        glBindTexture(GL_TEXTURE_2D, sun_texture);
-
-        glUniformMatrix4fv(0, 1, GL_FALSE, &transform_matrix_3[0][0]);
-        glUniformMatrix4fv(1, 1, GL_FALSE, &view_matrix[0][0]);
-        glUniformMatrix4fv(2, 1, GL_FALSE, &projection_matrix[0][0]);
-        glUniform3fv(3, 1, &sun_light_source[0]);
-        
-        glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
+        sun.render(proj_view_mat, program);
+        gas_giant.render(proj_view_mat, program);
+        ice_giant.render(proj_view_mat, program);
+        shafur.render(proj_view_mat, program);
+        terra.render(proj_view_mat, program);
 
         glfwSwapBuffers(window);
 

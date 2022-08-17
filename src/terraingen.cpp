@@ -102,13 +102,18 @@ type clamp(type x, type min, type max) {
 
 int main() {
     const unsigned int width = 1024, height = 512;
+    const double river_threshold = 1.0/256;
+    const int seed = 0x1003; // 0x1001 (4097)
+    const double elev_scale = 1.2; // 1.1
+    const double river_scale = 2.3;
+    const double mountain_scale = 1.8;
 
     image_data.resize(width * height * 4);
 
     std::array<int, 3> info;
     unsigned char* data = stbi_load("biome_map_t0.png", &info[0], &info[1], &info[2], 4);
 
-    std::array<siv::PerlinNoise, 3> noise = {siv::PerlinNoise(4097), siv::PerlinNoise(4098), siv::PerlinNoise(4099)};
+    std::array<siv::PerlinNoise, 5> noise = {siv::PerlinNoise(seed), siv::PerlinNoise(seed + 1), siv::PerlinNoise(seed + 2), siv::PerlinNoise(seed + 3), siv::PerlinNoise(seed + 4)};
 
     for(double x = 0; x < width; x++) {
         double angle = 2 * M_PI * (x / width);
@@ -117,11 +122,31 @@ int main() {
             double z_angle = M_PI * (y / height - 0.5);
             double xy_magnitude = cos(z_angle);
             std::array<double, 3> position = {xy1[0] * xy_magnitude, xy1[1] * xy_magnitude, sin(z_angle) * -1}; // z axis inverted for consistency with coordinates in the simulation
-            double elev = noise[0].normalizedOctave3D(position[0] * 1.1 + 0.798, position[1] * 1.1 - 0.332, position[2] * 1.1, 7, 0.6) * 20 + 6.0;
-            double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.442, position[2], 4, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
-            double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 4, 0.55) * 18 + 6;
+            double elev = noise[0].normalizedOctave3D(position[0] * elev_scale + 0.798, position[1] * elev_scale - 0.332, position[2] * elev_scale, 7, 0.6);
+            double mountain = -abs(noise[4].normalizedOctave3D(position[0] * mountain_scale - 0.225, position[1] * mountain_scale - 0.808, position[2] * mountain_scale, 5, 0.55)) + 1.0;
+            if(mountain < 0.9) mountain = 0.0;
+            double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.776, position[2] - 1.113, 3, 0.55) * 7 + (1 - abs(z_angle) / M_PI * 2) * 12;
+            double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 5, 0.55);
 
-            std::array<unsigned char, 4> biome = get_pixel_array(data, {clamp(floor(elev), 0.0, 11.0) * 12 + clamp(floor(humid), 0.0, 11.0), clamp(floor(temp), 0.0, 11.0)}, 144);
+            double height_val = std::min(elev * 10 + 6.5, 9.0) + mountain * elev * 10;
+            std::array<unsigned char, 4> biome = get_pixel_array(data, {int(clamp(floor(height_val), 0.0, 11.0) * 12 + clamp(floor(humid * 18 + 6), 0.0, 11.0)), int(clamp(floor(temp), 0.0, 11.0))}, 144);
+
+            /*if(biome[2] != 255 && biome[0] != 45 && height_val >= 7.0 && height_val < 7.05) {
+                biome = {0xff, 0xfb, 0xb3, 0xff};
+            }*/
+
+            if(biome[0] != 144 && biome[0] != 25 && biome[0] != 20 && biome[2] != 255 && biome[0] != 174) {
+                double river = noise[3].normalizedOctave3D(position[0] * river_scale + 5.667, position[1] * river_scale, position[2] * river_scale - 3.332, 4, 0.5);
+                if(river < river_threshold && river > -river_threshold) {
+                    biome = {25, 66, 211, 255};
+                } else {
+                    river = noise[3].normalizedOctave3D(position[0] * river_scale * 2 + 6.443, position[1] * river_scale * 2, position[2] * river_scale * 2 + 5.098, 4, 0.5);
+                    if(river < river_threshold / 2 && river > -river_threshold / 2) {
+                        biome = {25, 66, 211, 255};
+                    }
+                }
+            }
+            
             int index = (x + y * width) * 4;
             image_data[index] = biome[0];
             image_data[index + 1] = biome[1];
