@@ -8,8 +8,13 @@
 
 #include "global.cpp"
 
+#include "PerlinNoise-master\PerlinNoise.hpp"
+
 const double PI = 3.1415926535897932384626433832795028841971693993751058209749445923078164062;
 const double SQRT1_2 = sqrt(2) / 2;
+
+std::array<int, 2> world_size_chunks = {2450, 1225};
+std::array<int, 2> world_size = {world_size_chunks[0] * 16, world_size_chunks[1] * 16};
 
 int w, h, nrChannels;
 unsigned char* biome_map_terra = stbi_load("biome_map_t0.png", &w, &h, &nrChannels, 4);
@@ -165,29 +170,52 @@ double PerlinNoiseFactory::retrieve(double x, double y, double width, double hei
 }
 
 struct Worldgen {
-    PerlinNoiseFactory pfac1;
-    PerlinNoiseFactory pfac2;
-    PerlinNoiseFactory pfac3;
+    const unsigned int width = 1024, height = 512;
+    const double river_threshold = 1.0/256;
+    const int seed = 0x1003; // 0x1001 (4097)
+    const double elev_scale = 1.2; // 1.1
+    const double river_scale = 2.3;
+    const double mountain_scale = 1.8;
+
+    std::array<siv::PerlinNoise, 5> noise = {siv::PerlinNoise(seed), siv::PerlinNoise(seed + 1), siv::PerlinNoise(seed + 2), siv::PerlinNoise(seed + 3), siv::PerlinNoise(seed + 4)};
     RNG rng;
 
-    Worldgen(double seed, int width1, int height1, int octaves1, double persistance1, int width2, int height2, int octaves2, double persistance2, int width3, int height3, int octaves3, double persistance3) {
-        pfac1.set_parameters(seed, seed * 45.18754874623, width1, height1, octaves1, persistance1, 0.15, 0.5, true, false);
-        pfac2.set_parameters(seed, seed * 21.1324254354, width2, height2, octaves2, persistance2, 0.2, 0.5, true, false);
-        pfac3.set_parameters(seed, seed * 57.62634832648, width3, height3, octaves3, persistance3, 0.15, 0.5, true, false);
-        pfac1.generate_vectors();
-        pfac2.generate_vectors();
-        pfac3.generate_vectors();
+    Worldgen(double seed) {
         rng = {seed, seed * 60.5564301};
     }
 
-    unsigned int retrieve(std::array<int, 2> location, std::array<int, 2> map_size) {
-        double elevation = pfac1.retrieve(location[0], location[1], map_size[0], map_size[1]) * 12;
-        double temperature = clamp((pfac2.retrieve(location[0], location[1], map_size[0], map_size[1]) - 0.5) * 3 + (0.5 - std::abs(double(location[1]) / map_size[1] - 0.5)) * 24, 0, 11.999);
-        double humidity = pfac3.retrieve(location[0], location[1], map_size[0], map_size[1]) * 12;
+    uint32_t retrieve(std::array<int, 2> location, std::array<int, 2> map_size) {
+        double angle = 2 * PI * (double(location[0]) / world_size[0]);
+        std::array<double, 2> xy1{cos(angle), sin(angle)};
 
-        unsigned int biome = get_pixel(biome_map_terra, {floor(elevation) * 12 + floor(humidity), floor(temperature)}, 144);
-        if(elevation > 7 && elevation <= 7.03 && biome != 0xE59647FF && biome != 0xF4ECFFFF && biome != 0x2D541BFF && temperature >= 3) biome = 0xFFFBB3FF;
-        //printf("%u ", biome);
+        double z_angle = PI * (double(location[1]) / world_size[1] - 0.5);
+        double xy_magnitude = cos(z_angle);
+        std::array<double, 3> position = {xy1[0] * xy_magnitude, xy1[1] * xy_magnitude, sin(z_angle)}; // z axis inverted for consistency with coordinates in the simulation
+        double elev = noise[0].normalizedOctave3D(position[0] * elev_scale + 0.798, position[1] * elev_scale - 0.332, position[2] * elev_scale, 7, 0.6);
+        double mountain = -abs(noise[4].normalizedOctave3D(position[0] * mountain_scale - 0.225, position[1] * mountain_scale - 0.808, position[2] * mountain_scale, 5, 0.55)) + 1.0;
+        if(mountain < 0.9) mountain = 0.0;
+        double temp = noise[1].normalizedOctave3D(position[0], position[1] + 0.776, position[2] - 1.113, 3, 0.55) * 7 + (1 - abs(z_angle) / PI * 2) * 12;
+        double humid = noise[2].normalizedOctave3D(position[0] + 0.106, position[1], position[2], 5, 0.55);
+
+        double height_val = std::min(elev * 10 + 6.5, 9.0) + mountain * elev * 10;
+        uint32_t biome = get_pixel(biome_map_terra, {int(clamp(floor(height_val), 0.0, 11.0) * 12 + clamp(floor(humid * 18 + 6), 0.0, 11.0)), int(clamp(floor(temp), 0.0, 11.0))}, 144);
+
+        if(biome != 0xf4ecffff && biome != 0x2d541bff && height_val >= 7.0 && height_val < 7.02734375) {
+            biome = 0xfffbb3ff;
+        }
+
+        if(biome != 0x90b1dbff && biome != 0x1418adff && biome != 0x191fd3ff && biome != 0x1942d3ff && biome != 0xf4ecffff && biome != 0xaed3d3ff) {
+            double river = noise[3].normalizedOctave3D(position[0] * river_scale + 5.667, position[1] * river_scale, position[2] * river_scale - 3.332, 4, 0.5);
+            if(river < river_threshold && river > -river_threshold) {
+                biome = 0x1942d3ff;
+            } else {
+                river = noise[3].normalizedOctave3D(position[0] * river_scale * 2 + 6.443, position[1] * river_scale * 2, position[2] * river_scale * 2 + 5.098, 4, 0.5);
+                if(river < river_threshold / 2 && river > -river_threshold / 2) {
+                    biome = 0x1942d3ff;
+                }
+            }
+        }
+
         return biome;
     }
 };
@@ -501,9 +529,6 @@ bool insert_chunk(std::unordered_map<unsigned int, Chunk_data>& loaded_chunks, s
     }
     return false;
 }
-
-std::array<int, 2> world_size_chunks = {2450, 1225};
-std::array<int, 2> world_size = {world_size_chunks[0] * 16, world_size_chunks[1] * 16};
 
 std::array<int, 25> offsets = {
     -2 + 2 * world_size_chunks[0], -1 + 2 * world_size_chunks[0], 2 * world_size_chunks[0], 1 + 2 * world_size_chunks[0], 2 + 2 * world_size_chunks[0],

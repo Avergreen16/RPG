@@ -1,5 +1,6 @@
 #pragma once
 #include <unordered_map>
+#include <map>
 #include <string>
 #include <array>
 #include <sstream>
@@ -8,125 +9,125 @@
 #include "global.cpp"
 #include "render.cpp"
 
-std::unordered_map<char, std::array<int, 2>> standard_chars = {
-    {'A', {0, 6}},
-    {'B', {6, 6}},
-    {'C', {12, 6}},
-    {'D', {18, 6}},
-    {'E', {24, 6}},
-    {'F', {30, 6}},
-    {'G', {36, 6}},
-    {'H', {42, 6}},
-    {'I', {48, 6}},
-    {'J', {54, 6}},
-    {'K', {60, 6}},
-    {'L', {66, 6}},
-    {'M', {72, 8}},
-    {'N', {80, 6}},
-    {'O', {86, 6}},
-    {'P', {92, 6}},
-    {'Q', {98, 6}},
-    {'R', {104, 6}},
-    {'S', {110, 6}},
-    {'T', {116, 6}},
-    {'U', {122, 6}},
-    {'V', {128, 6}},
-    {'W', {134, 8}},
-    {'X', {142, 6}},
-    {'Y', {148, 6}},
-    {'Z', {154, 6}},
+std::map<char, int> standard_chars = {
+    {'A', 0},
+    {'B', 1},
+    {'C', 2},
+    {'D', 3},
+    {'E', 4},
+    {'F', 5},
+    {'G', 6},
+    {'H', 7},
+    {'I', 8},
+    {'J', 9},
+    {'K', 10},
+    {'L', 11},
+    {'M', 12},
+    {'N', 13},
+    {'O', 14},
+    {'P', 15},
+    {'Q', 16},
+    {'R', 17},
+    {'S', 18},
+    {'T', 19},
+    {'U', 10},
+    {'V', 21},
+    {'W', 22},
+    {'X', 23},
+    {'Y', 24},
+    {'Z', 25},
 
-    {'a', {160, 6}},
-    {'b', {166, 6}},
-    {'c', {172, 6}},
-    {'d', {178, 6}},
-    {'e', {184, 6}},
-    {'f', {190, 6}},
-    {'g', {196, 6}},
-    {'h', {202, 6}},
-    {'i', {208, 4}},
-    {'j', {212, 6}},
-    {'k', {218, 6}},
-    {'l', {224, 4}},
-    {'m', {228, 8}},
-    {'n', {236, 6}},
-    {'o', {242, 6}},
-    {'p', {248, 6}},
-    {'q', {254, 7}},
-    {'r', {261, 6}},
-    {'s', {267, 6}},
-    {'t', {273, 6}},
-    {'u', {279, 6}},
-    {'v', {285, 6}},
-    {'w', {291, 8}},
-    {'x', {299, 6}},
-    {'y', {305, 6}},
-    {'z', {311, 6}},
+    {'a', 26},
+    {'b', 27},
+    {'c', 28},
+    {'d', 29},
+    {'e', 30},
+    {'f', 31},
+    {'g', 32},
+    {'h', 33},
+    {'i', 34},
+    {'j', 35},
+    {'k', 36},
+    {'l', 37},
+    {'m', 38},
+    {'n', 39},
+    {'o', 40},
+    {'p', 41},
+    {'q', 42},
+    {'r', 43},
+    {'s', 44},
+    {'t', 45},
+    {'u', 46},
+    {'v', 47},
+    {'w', 48},
+    {'x', 49},
+    {'y', 50},
+    {'z', 51},
 
-    {' ', {455, 4}},
-    {'_', {317, 6}},
-    {'-', {323, 5}},
-    {'+', {328, 5}},
-    {'=', {333, 5}},
-    {'@', {338, 8}},
-    {'.', {549, 4}},
-    {'!', {553, 4}},
-    {'?', {350, 6}}, 
-    {'(', {597, 5}},
-    {')', {602, 5}},
-    {'[', {607, 5}},
-    {']', {612, 5}},
-    {':', {557, 4}},
-    {';', {561, 4}},
-    {',', {565, 4}},
-    {'\\', {374, 4}},
-    {'/', {378, 4}},
-    {'<', {382, 4}},
-    {'>', {386, 4}},
-    {'*', {390, 5}},
-    {'\'', {569, 4}},
-    {'"', {573, 5}},
-    {'`', {578, 4}},
-    {'~', {582, 6}},
-    {'|', {588, 4}},
-    {'^', {592, 5}},
-    {'{', {617, 5}},
-    {'}', {622, 5}},
-    {'#', {627, 7}},
-    {'&', {634, 6}},
-    {'$', {640, 7}},
-    {'%', {647, 8}},
+    {'0', 52},
+    {'1', 53},
+    {'2', 54},
+    {'3', 55},
+    {'4', 56},
+    {'5', 57},
+    {'6', 58},
+    {'7', 59},
+    {'8', 60},
+    {'9', 61},
 
-    {'0', {395, 6}},
-    {'1', {401, 6}},
-    {'2', {407, 6}},
-    {'3', {413, 6}},
-    {'4', {419, 6}},
-    {'5', {425, 6}},
-    {'6', {431, 6}},
-    {'7', {437, 6}},
-    {'8', {443, 6}},
-    {'9', {449, 6}}
+    {'.', 68},
+    {'!', 69},
+    {'?', 70},
+    {':', 71},
+    {';', 72},
+    {',', 73},
+    {'\'', 74},
+    {'`', 75},
+    {'\"', 76},
+    {'(', 77},
+    {')', 78},
+    {'[', 79},
+    {']', 80},
+    {'{', 81},
+    {'}', 82},
+    {'+', 83},
+    {'-', 84},
+    {'=', 85},
+    {'*', 86},
+    {'<', 87},
+    {'>', 88},
+    {'^', 89},
+    {'%', 90},
+    {'_', 91},
+    {'/', 92},
+    {'\\', 93},
+    {'&', 94},
+    {'|', 95},
+    {'@', 96},
+    {'~', 97},
+    {'#', 98},
+    {'$', 99},
+    {' ', 100}
 };
 
-std::unordered_map<char, std::array<int, 2>> hex_chars = {
-    {'-', {323, 5}},
-    {'0', {395, 6}},
-    {'1', {459, 6}},
-    {'2', {465, 6}},
-    {'3', {471, 6}},
-    {'4', {477, 6}},
-    {'5', {483, 6}},
-    {'6', {489, 6}},
-    {'7', {495, 6}},
-    {'8', {501, 6}},
-    {'9', {507, 6}},
-    {'a', {513, 6}},
-    {'b', {519, 6}},
-    {'c', {525, 6}},
-    {'d', {531, 6}},
-    {'e', {537, 6}},
-    {'f', {543, 6}}
+std::map<char, int> hex_chars = {
+    {'-', 84},
+    {'0', 52},
+    {'1', 53},
+    {'2', 54},
+    {'3', 55},
+    {'4', 56},
+    {'5', 57},
+    {'6', 58},
+    {'7', 59},
+    {'8', 60},
+    {'9', 61},
+    {'a', 62},
+    {'b', 63},
+    {'c', 64},
+    {'d', 65},
+    {'e', 66},
+    {'f', 67}
 };
 
 std::unordered_map<char, int> hex_to_dec = {
@@ -152,10 +153,10 @@ std::array<char, 11> valid_numbers = {'-', '0', '1', '2', '3', '4', '5', '6', '7
 std::array<char, 17> valid_hex_numbers = {'-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
 int get_string_length(std::string str, int text_scale) {
-    int collector = -1;
+    int collector = 0;
     for(char c : str) {
         if(standard_chars.contains(c)) {
-            collector += standard_chars[c][2] + 1;
+            collector += 6;
         }
     }
     return collector * text_scale;
@@ -167,7 +168,7 @@ struct text_struct {
     int wrap;
     int len;
     int lines;
-    std::vector<int> first_chars = {0};
+    std::vector<int> first_chars = {00};
     bool data_generated = false;
 
     void set_values(std::string str, int wrap, int size) {
@@ -231,7 +232,7 @@ struct text_struct {
                     }
                 }
                 if(hex_mode && hex_chars.contains(c)) {
-                    int width = hex_chars[c][1];
+                    int width = 6;
                     if((current_len + width) * size > wrap) {
                         len = std::max(len, current_len);
                         current_len = 0;
@@ -239,10 +240,9 @@ struct text_struct {
                         first_chars.push_back(i);
                     }
                     current_len += width;
-                    if(i < str_size - 1) ++current_len;
                 } else if(standard_chars.contains(c)) {
                     hex_mode = false;
-                    int width = standard_chars[c][1];
+                    int width = 6;
                     if((current_len + width) * size > wrap) {
                         len = std::max(len, current_len);
                         current_len = 0;
@@ -263,7 +263,6 @@ struct text_struct {
                         }
                     }
                     current_len += width;
-                    if(i < str_size - 1) ++current_len;
                 }
             }
             len = std::max(len, current_len);
@@ -313,34 +312,32 @@ int render_text(unsigned int shader, unsigned int source_img, std::array<int, 3>
         }
 
         if(hex_mode && hex_chars.contains(c)) {
-            std::array<int, 2> char_data = hex_chars[c];
-            double text_width = char_data[1] * text_scale;
+            double text_width = 6 * text_scale;
             
             glUseProgram(shader);
 
             glBindTexture(GL_TEXTURE_2D, source_img);
             glUniform1f(0, 0.0f);
             glUniform2f(1, (double)window_size[0], (double)window_size[1]);
-            glUniform4f(3, current_pos[0], current_pos[1], float(text_width), float(12 * text_scale));
-            glUniform4f(7, (float)char_data[0] / source_img_info[0], 0.0f, (float)char_data[1] / source_img_info[0], 1.0f);
+            glUniform4f(3, current_pos[0], current_pos[1], float(text_width), float(10 * text_scale));
+            glUniform4f(7,  (float)hex_chars[c] * 6 / source_img_info[0], 0.0f, 6.0f / source_img_info[0], 1.0f);
             glUniform4f(11, color[0], color[1], color[2], 1.0f);
 
             glDrawArrays(GL_TRIANGLES, 0, 6);
 
-            current_pos[0] += text_width + text_scale;
+            current_pos[0] += text_width;
             if(current_pos[0] - lower_left[0] > wrap_around) {
                 current_pos[0] = lower_left[0];
-                current_pos[1] -= 13 * text_scale;
+                current_pos[1] -= 11 * text_scale;
                 ++lines;
             }
         } else if(standard_chars.contains(c)) {
             hex_mode = false;
-            std::array<int, 2> char_data = standard_chars[c];
-            double text_width = char_data[1] * text_scale;
+            double text_width = 6 * text_scale;
 
             if(current_pos[0] - lower_left[0] + text_width > wrap_around) {
                 current_pos[0] = lower_left[0];
-                current_pos[1] -= 13 * text_scale;
+                current_pos[1] -= 11 * text_scale;
                 if(c == ' ') {
                     int j = i + 1;
                     for(; j < str_size; ++j) {
@@ -359,13 +356,13 @@ int render_text(unsigned int shader, unsigned int source_img, std::array<int, 3>
             glBindTexture(GL_TEXTURE_2D, source_img);
             glUniform1f(0, 0.0f);
             glUniform2f(1, (double)window_size[0], (double)window_size[1]);
-            glUniform4f(3, current_pos[0], current_pos[1], float(text_width), float(12 * text_scale));
-            glUniform4f(7, (float)char_data[0] / source_img_info[0], 0.0f, (float)char_data[1] / source_img_info[0], 1.0f);
+            glUniform4f(3, current_pos[0], current_pos[1], float(text_width), float(10 * text_scale));
+            glUniform4f(7, (float)standard_chars[c] * 6 / source_img_info[0], 0.0f, 6.0f / source_img_info[0], 1.0f);
             glUniform4f(11, color[0], color[1], color[2], 1.0f);
 
             glDrawArrays(GL_TRIANGLES, 0, 6);
 
-            current_pos[0] += text_width + text_scale;
+            current_pos[0] += text_width;
         }
     }
     return lines;
@@ -383,7 +380,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
         glBindTexture(GL_TEXTURE_2D, source_img);
         glUniform1f(0, 0.0f);
         glUniform2f(1, (double)window_size[0], (double)window_size[1]);
-        glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(12 * text_scale));
+        glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
         glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
         glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -452,16 +449,15 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
             }
         }
         if(hex_mode && hex_chars.contains(c)) {
-            std::array<int, 2> char_data = hex_chars[c];
-            double text_width = char_data[1] * text_scale;
+            double text_width = 6.0f * text_scale;
             
             glUseProgram(shader);
 
             glBindTexture(GL_TEXTURE_2D, source_img);
             glUniform1f(0, 0.00001f);
             glUniform2f(1, (double)window_size[0], (double)window_size[1]);
-            glUniform4f(3, current_pos[0], current_pos[1], float(text_width), float(12 * text_scale));
-            glUniform4f(7, (float)char_data[0] / source_img_info[0], 0.0f, (float)char_data[1] / source_img_info[0], 1.0f);
+            glUniform4f(3, current_pos[0], current_pos[1], float(text_width), float(10 * text_scale));
+            glUniform4f(7, (float)hex_chars[c] * 6 / source_img_info[0], 0.0f, 6.0f / source_img_info[0], 1.0f);
 
             if(esc_seq == 0) glUniform4f(11, color[0], color[1], color[2], 1.0f);
             else glUniform4f(11, color[0], color[1], color[2], 0.4f);
@@ -472,7 +468,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                 glBindTexture(GL_TEXTURE_2D, source_img);
                 glUniform1f(0, 0.0f);
                 glUniform2f(1, (double)window_size[0], (double)window_size[1]);
-                glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(12 * text_scale));
+                glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
                 glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
                 glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -480,22 +476,21 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
 
-            current_pos[0] += text_width + text_scale;
+            current_pos[0] += text_width;
 
             if(esc_seq > 0) --esc_seq;
         } else if(standard_chars.contains(c)) {
             hex_mode = false;
 
-            std::array<int, 2> char_data = standard_chars[c];
-            double text_width = char_data[1] * text_scale;
+            double text_width = 6.0f * text_scale;
             
             glUseProgram(shader);
 
             glBindTexture(GL_TEXTURE_2D, source_img);
             glUniform1f(0, 0.00001f);
             glUniform2f(1, (double)window_size[0], (double)window_size[1]);
-            glUniform4f(3, current_pos[0], current_pos[1], float(text_width), float(12 * text_scale));
-            glUniform4f(7, (float)char_data[0] / source_img_info[0], 0.0f, (float)char_data[1] / source_img_info[0], 1.0f);
+            glUniform4f(3, current_pos[0], current_pos[1], float(text_width), float(10 * text_scale));
+            glUniform4f(7, (float)standard_chars[c] * 6 / source_img_info[0], 0.0f, 6.0f / source_img_info[0], 1.0f);
 
             if(esc_seq == 0) glUniform4f(11, color[0], color[1], color[2], 1.0f);
             else glUniform4f(11, color[0], color[1], color[2], 0.4f);
@@ -506,7 +501,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                 glBindTexture(GL_TEXTURE_2D, source_img);
                 glUniform1f(0, 0.0f);
                 glUniform2f(1, (double)window_size[0], (double)window_size[1]);
-                glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(12 * text_scale));
+                glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
                 glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
                 glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -514,7 +509,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                 glDrawArrays(GL_TRIANGLES, 0, 6);
             }
             
-            current_pos[0] += text_width + text_scale;
+            current_pos[0] += text_width;
 
             if(esc_seq > 0) --esc_seq;
         }
@@ -524,7 +519,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
         glBindTexture(GL_TEXTURE_2D, source_img);
         glUniform1f(0, 0.0f);
         glUniform2f(1, (double)window_size[0], (double)window_size[1]);
-        glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(12 * text_scale));
+        glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
         glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
         glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -565,10 +560,10 @@ int get_len(std::string str) {
             }
         }
         if(hex_mode && hex_chars.contains(c)) {
-            len += hex_chars[c][1] + 1;
+            len += 6;
         } else if(standard_chars.contains(c)) {
             hex_mode = false;
-            len += standard_chars[c][1] + 1;
+            len += 6;
         }
     }
     return len;

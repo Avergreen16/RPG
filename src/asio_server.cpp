@@ -3,7 +3,7 @@
 int main() {
     netwk::TCP_server server(0xa50e);
 
-    netwk::enemy_map.emplace(0xfffe, netwk::Server_enemy({23472.5, 10378.5}, SOUTH));
+    netwk::enemy_map.emplace(0xfffe, netwk::Server_enemy({8317.5, 9003.5}, SOUTH));
 
     std::thread server_thread(
         [&server]() {

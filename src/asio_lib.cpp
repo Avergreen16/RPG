@@ -46,7 +46,7 @@ namespace netwk {
     std::unordered_map<uint64_t, Server_entity> entity_map;
 
     struct Server_enemy {
-        std::array<double, 2> position = {13150 + 0.5, 8110 + 0.5};
+        std::array<double, 2> position = {8317.5, 9003.5};
         
         states state = IDLE;
         directions direction_moving = SOUTH;
@@ -312,7 +312,7 @@ namespace netwk {
                                     }
                                     case 1: { // chat message
                                         std::cout << "Recieved " << bytes_transferred << " bytes from client " + std::to_string(client_id) + ". (chat message)\n";
-                                        std::string message = this->player_name + " \\cfff: " + make_string(reinterpret_cast<char*>(buffer_body->data()), bytes_transferred);
+                                        std::string message = this->player_name + "\\cfff: " + make_string(reinterpret_cast<char*>(buffer_body->data()), bytes_transferred);
                                         std::vector<uint8_t> body(message.size());
                                         memcpy(body.data(), message.data(), message.size());
                                         parent_server->broadcast(0, body);
@@ -391,7 +391,7 @@ namespace netwk {
 
         chunk_gen_thread = std::thread(
             [this]() {
-                Worldgen worldgen(0.7707326, 6, 3, 7, 1.5, 4, 4, 3, 1.5, 4, 4, 4, 1.3);
+                Worldgen worldgen(0.7707326);
 
                 while(true) {
                     if(chunk_requests.size() != 0) {

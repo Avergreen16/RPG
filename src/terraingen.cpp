@@ -102,10 +102,10 @@ type clamp(type x, type min, type max) {
 
 int main() {
     const unsigned int width = 1024, height = 512;
-    const double river_threshold = 1.0/256;
+    const double river_threshold = 1.0/512;
     const int seed = 0x1003; // 0x1001 (4097)
     const double elev_scale = 1.2; // 1.1
-    const double river_scale = 2.3;
+    const double river_scale = 4.8;
     const double mountain_scale = 1.8;
 
     image_data.resize(width * height * 4);
@@ -139,12 +139,12 @@ int main() {
                 double river = noise[3].normalizedOctave3D(position[0] * river_scale + 5.667, position[1] * river_scale, position[2] * river_scale - 3.332, 4, 0.5);
                 if(river < river_threshold && river > -river_threshold) {
                     biome = {25, 66, 211, 255};
-                } else {
+                }/* else {
                     river = noise[3].normalizedOctave3D(position[0] * river_scale * 2 + 6.443, position[1] * river_scale * 2, position[2] * river_scale * 2 + 5.098, 4, 0.5);
                     if(river < river_threshold / 2 && river > -river_threshold / 2) {
                         biome = {25, 66, 211, 255};
                     }
-                }
+                }*/
             }
             
             int index = (x + y * width) * 4;

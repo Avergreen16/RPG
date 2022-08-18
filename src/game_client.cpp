@@ -77,7 +77,7 @@ int main() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    Setting setting(window, connection, {23460.5, 10378.5}, player_name);
+    Setting setting(window, connection, {8307.5, 8996.5}, player_name);
     glfwSetWindowUserPointer(window, &setting);
     glfwSetKeyCallback(window, Setting::key_callback);
     glfwSetCharCallback(window, Setting::char_callback);
