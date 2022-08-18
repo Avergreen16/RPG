@@ -414,7 +414,7 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
             if(key == GLFW_KEY_BACKSPACE) {
                 if(setting->chat_input_string.size() != 0 && setting->type_pos != 0) {
                     int char_pos = setting->type_pos - 1;
-                    if(standard_chars.contains(setting->chat_input_string[char_pos])) setting->type_len -= 6 * 2 + 2;
+                    if(standard_chars.contains(setting->chat_input_string[char_pos])) setting->type_len -= standard_chars[setting->chat_input_string[char_pos]][1] * 2 + 2;
                     setting->chat_input_string.erase(setting->chat_input_string.begin() + char_pos);
                     --setting->type_pos;
                     if(setting->type_pos < setting->type_start) {
@@ -434,7 +434,7 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
             } else if(key == GLFW_KEY_LEFT) {
                 if(setting->chat_input_string.size() != 0 && setting->type_pos != 0) {
                     --setting->type_pos;
-                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len -= 6 * 2 + 2;
+                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_pos]][1] * 2 + 2;
                     if(setting->type_pos < setting->type_start) {
                         --setting->type_start;
                         setting->type_len = 0;
@@ -442,10 +442,10 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
                 }
             } else if(key == GLFW_KEY_RIGHT) {
                 if(setting->chat_input_string.size() != 0 && setting->type_pos < setting->chat_input_string.size()) {
-                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len += 6 * 2 + 2;
+                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len += standard_chars[setting->chat_input_string[setting->type_pos]][1] * 2 + 2;
                     ++setting->type_pos;
                     while(setting->type_len >= setting->width - 20) {
-                        if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= 6 * 2 + 2;
+                        if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_start]][1] * 2 + 2;
                         ++setting->type_start;
                     }
                 }
@@ -460,7 +460,7 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
             if(key == GLFW_KEY_BACKSPACE) {
                 if(setting->chat_input_string.size() != 0 && setting->type_pos != 0) {
                     int char_pos = setting->type_pos - 1;
-                    if(standard_chars.contains(setting->chat_input_string[char_pos])) setting->type_len -= 6 * 2 + 2;
+                    if(standard_chars.contains(setting->chat_input_string[char_pos])) setting->type_len -= standard_chars[setting->chat_input_string[char_pos]][1] * 2 + 2;
                     setting->chat_input_string.erase(setting->chat_input_string.begin() + char_pos);
                     --setting->type_pos;
                     if(setting->type_pos < setting->type_start) {
@@ -471,7 +471,7 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
             } else if(key == GLFW_KEY_LEFT) {
                 if(setting->chat_input_string.size() != 0 && setting->type_pos != 0) {
                     --setting->type_pos;
-                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len -= 6 * 2 + 2;
+                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_pos]][1] * 2 + 2;
                     if(setting->type_pos < setting->type_start) {
                         --setting->type_start;
                         setting->type_len = 0;
@@ -479,10 +479,10 @@ void Setting::key_callback(GLFWwindow* window, int key, int scancode, int action
                 }
             } else if(key == GLFW_KEY_RIGHT) {
                 if(setting->chat_input_string.size() != 0 && setting->type_pos < setting->chat_input_string.size()) {
-                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len += 6 * 2 + 2;
+                    if(standard_chars.contains(setting->chat_input_string[setting->type_pos])) setting->type_len += standard_chars[setting->chat_input_string[setting->type_pos]][1] * 2 + 2;
                     ++setting->type_pos;
                     while(setting->type_len >= setting->width - 20) {
-                        if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= 6 * 2 + 2;
+                        if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_start]][1] * 2 + 2;
                         ++setting->type_start;
                     }
                 }
@@ -513,11 +513,11 @@ void Setting::scroll_callback(GLFWwindow* window, double xoffset, double yoffset
 void Setting::char_callback(GLFWwindow* window, uint codepoint) {
     Setting* setting = (Setting*)(glfwGetWindowUserPointer(window));
     if(setting->current_activity == CHAT) {
-        if(standard_chars.contains(codepoint)) setting->type_len += 6 * 2 + 2;
+        if(standard_chars.contains(codepoint)) setting->type_len += standard_chars[codepoint][1] * 2 + 2;
         setting->chat_input_string.insert(setting->chat_input_string.begin() + setting->type_pos, codepoint);
         ++setting->type_pos;
         while(setting->type_len >= setting->width - 20) {
-            if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= 6 * 2 + 2;
+            if(standard_chars.contains(setting->chat_input_string[setting->type_start])) setting->type_len -= standard_chars[setting->chat_input_string[setting->type_start]][1] * 2 + 2;
             ++setting->type_start;
         }
     }
