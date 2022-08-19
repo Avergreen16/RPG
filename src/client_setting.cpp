@@ -637,17 +637,17 @@ void Setting::render_gui() {
     std::string hex_coords = to_hex_string(player.position[0]) + " " + to_hex_string(player.position[1]);
     std::string dec_coords = std::to_string(int(player.position[0])) + " " + std::to_string(int(player.position[1]));
 
-    render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(width / 2 - 10 - (version.generate_data() * 2)), float(height / 2 - 64)}, version.str, 2, 1000);
-    render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(width / 2 - 10 - ((hex_coords.size() - 4) * 7 - 3) * 2), float(height / 2 - 90)}, hex_coords, 2, 500);
-    render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(width / 2 - 10 - (dec_coords.size() * 7 - 3) * 2), float(height / 2 - 116)}, dec_coords, 2, 500);
+    render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(width / 2 - 8 - ((version.str.size() - 15) * 12 - 2)), float(height / 2 - 52)}, version.str, 2, 1000);
+    render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(width / 2 - 8 - ((hex_coords.size() - 4) * 12 - 2)), float(height / 2 - 78)}, hex_coords, 2, 500);
+    render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(width / 2 - 8 - (dec_coords.size() * 12 - 2)), float(height / 2 - 104)}, dec_coords, 2, 500);
 
     if(current_activity == CHAT) {
-        render_text_type(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(-width / 2 + 10), float(height / 2 - 34)}, chat_input_string.substr(type_start), 2, type_pos - type_start, width);
+        render_text_type(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(-width / 2 + 6), float(height / 2 - 26)}, chat_input_string.substr(type_start), 2, type_pos - type_start, width);
         
         glUseProgram(shader_map[4]);
         glUniform1f(0, 0.001f);
         glUniform2f(1, width, height);
-        glUniform4f(3, -width / 2, height / 2 - 37, width, 37);
+        glUniform4f(3, -width / 2, height / 2 - 32, width, 32);
         glUniform4f(7, 0.0f, 0.0f, 0.0f, 0.125f);
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
@@ -655,14 +655,14 @@ void Setting::render_gui() {
     int text_scale = 0.0625 * (scale - 16);
     render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(-player.name.generate_data() / 2 * text_scale), float(0.875 * scale)}, player.name.str, text_scale, 1000);
 
-    int text_y_pos = height / 2 - 64;
+    int text_y_pos = height / 2 - 52;
     int chat_line_counter = 0;
     for(text_struct message : chat_list) {
         if(chat_line_counter >= chat_line) {
             int lines_displayed = chat_line_counter - chat_line;
             if(lines_displayed < 12) {
                 int lines_passed = render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(-width / 2 + 10), float(text_y_pos)}, message.str.substr(0, (12 - lines_displayed < message.lines) ? message.first_chars[12 - lines_displayed] : message.str.length()), 2, 600);
-                text_y_pos -= lines_passed * 26;
+                text_y_pos -= lines_passed * 22;
                 chat_line_counter += lines_passed;
             }
         } else {
@@ -670,7 +670,7 @@ void Setting::render_gui() {
             if(chat_line_counter > chat_line) {
                 int num = message.lines - (chat_line_counter - chat_line);
                 int lines_passed = render_text(shader_map[1], texture_map[1].id, texture_map[1].data, {width, height}, {float(-width / 2 + 10), float(text_y_pos)}, message.str.substr(message.first_chars[num]), 2, 600);
-                text_y_pos -= lines_passed * 26;
+                text_y_pos -= lines_passed * 22;
             }
         }
     }
@@ -679,7 +679,7 @@ void Setting::render_gui() {
         glUseProgram(shader_map[4]);
         glUniform1f(0, 0.001f);
         glUniform2f(1, width, height);
-        glUniform4f(3, -width / 2, text_y_pos + 26 - 5, 620, height / 2 - text_y_pos - 56);
+        glUniform4f(3, -width / 2, text_y_pos + 22 - 6, 620, height / 2 - (text_y_pos + 22 - 6) - 26);
         glUniform4f(7, 0.0f, 0.0f, 0.0f, 0.125f);
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }

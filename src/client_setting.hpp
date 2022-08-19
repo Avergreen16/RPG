@@ -108,7 +108,7 @@ struct Setting {
     Counter water_cycle_timer = {0, 800000000};
     Counter water_sprite_counter = {0, 4};
 
-    text_struct version = {"\\c44fThe Simulation \\cfffpre-alpha \\cf660.0.\\x1", 2, 1000};
+    text_struct version = {"\\c44fThe Simulation \\cfffpre-alpha \\cf660.0.1", 2, 1000};
 
     // chunks
     std::unordered_map<uint, Chunk_data> loaded_chunks;

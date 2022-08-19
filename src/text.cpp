@@ -288,7 +288,7 @@ int render_text(unsigned int shader, unsigned int source_img, std::array<int, 3>
                 
                 case 'n':
                     current_pos[0] = lower_left[0];
-                    current_pos[1] -= 13 * text_scale;
+                    current_pos[1] -= 11 * text_scale;
                     i++;
                     lines++;
                     continue;
@@ -310,8 +310,14 @@ int render_text(unsigned int shader, unsigned int source_img, std::array<int, 3>
                     break;
             }
         }
-
-        if(hex_mode && hex_chars.contains(c)) {
+        if(c == ' ') {
+            current_pos[0] += 6.0f * text_scale;
+            if(current_pos[0] - lower_left[0] > wrap_around) {
+                current_pos[0] = lower_left[0];
+                current_pos[1] -= 11 * text_scale;
+                ++lines;
+            }
+        } else if(hex_mode && hex_chars.contains(c)) {
             double text_width = 6 * text_scale;
             
             glUseProgram(shader);
@@ -381,7 +387,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
         glUniform1f(0, 0.0f);
         glUniform2f(1, (double)window_size[0], (double)window_size[1]);
         glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
-        glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
+        glUniform4f(7, 600.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
         glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -448,7 +454,23 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                     break;
             }
         }
-        if(hex_mode && hex_chars.contains(c)) {
+        if(c == ' ') {
+            if(i == type_pos) {
+                glBindTexture(GL_TEXTURE_2D, source_img);
+                glUniform1f(0, 0.0f);
+                glUniform2f(1, (double)window_size[0], (double)window_size[1]);
+                glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
+                glUniform4f(7, 600.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
+
+                glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
+
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+
+            current_pos[0] += 6.0f * text_scale;
+
+            if(esc_seq > 0) --esc_seq;
+        } else if(hex_mode && hex_chars.contains(c)) {
             double text_width = 6.0f * text_scale;
             
             glUseProgram(shader);
@@ -469,7 +491,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                 glUniform1f(0, 0.0f);
                 glUniform2f(1, (double)window_size[0], (double)window_size[1]);
                 glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
-                glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
+                glUniform4f(7, 600.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
                 glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -502,7 +524,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
                 glUniform1f(0, 0.0f);
                 glUniform2f(1, (double)window_size[0], (double)window_size[1]);
                 glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
-                glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
+                glUniform4f(7, 600.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
                 glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -520,7 +542,7 @@ void render_text_type(unsigned int shader, unsigned int source_img, std::array<i
         glUniform1f(0, 0.0f);
         glUniform2f(1, (double)window_size[0], (double)window_size[1]);
         glUniform4f(3, current_pos[0], current_pos[1], float(text_scale), float(10 * text_scale));
-        glUniform4f(7, 359.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
+        glUniform4f(7, 600.0f / source_img_info[0], 0.0f, 1.0f / source_img_info[0], 1.0f);
 
         glUniform4f(11, 1.0f, 1.0f, 1.0f, 1.0f);
 
