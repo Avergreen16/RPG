@@ -78,6 +78,8 @@ g++ -c src\opengl_test.cpp -std=c++20 -I include && g++ opengl_test.o glad.o -o 
 
 g++ -c src\terraingen.cpp -std=c++20 -I include && g++ terraingen.o -o bin\debug\terraingen -lmingw32
 
+g++ -c src\billboarding_test\world.cpp -std=c++20 -I include && g++ world.o glad.o -o bin\debug\billbd -Linclude\glfw\lib-static-ucrt -lmingw32 -lglfw3dll
+
 
 
 packet IDs:
