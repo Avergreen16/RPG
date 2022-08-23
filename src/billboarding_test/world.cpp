@@ -23,12 +23,13 @@ layout(location = 1) in vec2 in_tex_coord;
 
 layout(location = 0) uniform mat4 proj_view_mat;
 layout(location = 1) uniform mat4 trans_mat;
+layout(location = 2) uniform vec2 tex_offset;
 
 out vec2 tex_coord;
 
 void main() {
     gl_Position = proj_view_mat * (trans_mat * vec4(in_pos, 1.0));
-    tex_coord = in_tex_coord;
+    tex_coord = in_tex_coord + tex_offset;
 }
 )""";
 
@@ -47,6 +48,34 @@ void main() {
     FragColor = color;
 }
 )""";
+
+struct Counter {
+    unsigned int value;
+    unsigned int limit;
+
+    bool increment() {
+        value++;
+        if(value >= limit) {
+            value = 0;
+            return true;
+        }
+        return false;
+    }
+
+    bool increment_by(unsigned int change) {
+        value += change;
+        if(value >= limit) {
+            value %= limit;
+            return true;
+        }
+        return false;
+    }
+
+    void set_limit(int new_limit) {
+        limit = new_limit;
+        if(value >= limit) value = 0;
+    }
+};
 
 time_t __attribute__((always_inline)) get_time() {
     return std::chrono::steady_clock::now().time_since_epoch().count();
@@ -221,70 +250,92 @@ unsigned int load_texture(char address[], std::array<int, 3> &info) {
     return texture_id;
 }
 
-void load_vertices() {
-    vertex_vector = std::vector<Vertex>{
-    {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, {{1.0f, 0.0f, 0.0f}, {0.5f, 0.0f}}, // 0, 0, -1
-    {{0.0f, 1.0f, 0.0f}, {0.0f, 0.5f}}, {{1.0f, 1.0f, 0.0f}, {0.5f, 0.5f}},
+std::vector<Vertex> vertex_vector1 = {
+    {{0.0f, 1.0f, 2.0f}, {0.0f, 0.125f}},
+    {{0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+    {{0.0f, -1.0f, 2.0f}, {0.25f, 0.125f}},
+    {{0.0f, -1.0f, 2.0f}, {0.25f, 0.125f}},
+    {{0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+    {{0.0f, -1.0f, 0.0f}, {0.25f, 0.0f}}
+};
 
-    {{0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, {{1.0f, 1.0f, 0.0f}, {0.5f, 0.0f}}, // 0, 1, -1
-    {{0.0f, 2.0f, 0.0f}, {0.0f, 0.5f}}, {{1.0f, 2.0f, 0.0f}, {0.5f, 0.5f}},
+std::array<Vertex, 24> cube_vertices = {
+    Vertex{{0.0f, 1.0f, 1.0f}, {0.0f, 0.5f}},
+    Vertex{{0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // -x
+    Vertex{{0.0f, 0.0f, 1.0f}, {0.5f, 0.5f}},
+    Vertex{{0.0f, 0.0f, 0.0f}, {0.5f, 0.0f}},
+
+    Vertex{{1.0f, 0.0f, 1.0f}, {0.0f, 0.5f}},
+    Vertex{{1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // +x
+    Vertex{{1.0f, 1.0f, 1.0f}, {0.5f, 0.5f}},
+    Vertex{{1.0f, 1.0f, 0.0f}, {0.5f, 0.0f}},
+
+    Vertex{{0.0f, 0.0f, 1.0f}, {0.0f, 0.5f}},
+    Vertex{{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // -y
+    Vertex{{1.0f, 0.0f, 1.0f}, {0.5f, 0.5f}},
+    Vertex{{1.0f, 0.0f, 0.0f}, {0.5f, 0.0f}},
     
-    {{0.0f, 2.0f, 0.0f}, {0.0f, 0.0f}}, {{1.0f, 2.0f, 0.0f}, {0.5f, 0.0f}}, // 0, 2, -1
-    {{0.0f, 3.0f, 0.0f}, {0.0f, 0.5f}}, {{1.0f, 3.0f, 0.0f}, {0.5f, 0.5f}}, 
+    Vertex{{1.0f, 1.0f, 1.0f}, {0.0f, 0.5f}},
+    Vertex{{1.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // +y
+    Vertex{{0.0f, 1.0f, 1.0f}, {0.5f, 0.5f}},
+    Vertex{{0.0f, 1.0f, 0.0f}, {0.5f, 0.0f}},
 
-    {{1.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, {{2.0f, 1.0f, 0.0f}, {0.5f, 0.0f}}, // 1, 1, -1
-    {{1.0f, 2.0f, 0.0f}, {0.0f, 0.5f}}, {{2.0f, 2.0f, 0.0f}, {0.5f, 0.5f}}, 
+    Vertex{{1.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+    Vertex{{1.0f, 0.0f, 0.0f}, {0.0f, 0.5f}}, // -z
+    Vertex{{0.0f, 1.0f, 0.0f}, {0.5f, 1.0f}},
+    Vertex{{0.0f, 0.0f, 0.0f}, {0.5f, 0.5f}},
 
-    {{1.0f, 2.0f, 0.0f}, {0.0f, 0.0f}}, {{2.0f, 2.0f, 0.0f}, {0.5f, 0.0f}}, // 1, 2, -1
-    {{1.0f, 3.0f, 0.0f}, {0.0f, 0.5f}}, {{2.0f, 3.0f, 0.0f}, {0.5f, 0.5f}}, 
+    Vertex{{0.0f, 1.0f, 1.0f}, {0.5f, 0.5f}},
+    Vertex{{0.0f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // +z
+    Vertex{{1.0f, 1.0f, 1.0f}, {1.0f, 0.5f}},
+    Vertex{{1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}}
+};
 
-    {{2.0f, 2.0f, 0.0f}, {0.0f, 0.0f}}, {{3.0f, 2.0f, 0.0f}, {0.5f, 0.0f}}, // 2, 2, -1
-    {{2.0f, 3.0f, 0.0f}, {0.0f, 0.5f}}, {{3.0f, 3.0f, 0.0f}, {0.5f, 0.5f}}, 
+std::array<uint32_t, 36> cube_indices = {
+    0, 1, 2, 2, 1, 3,
+    4, 5, 6, 6, 5, 7,
+    8, 9, 10, 10, 9, 11,
+    12, 13, 14, 14, 13, 15,
+    16, 17, 18, 18, 17, 19,
+    20, 21, 22, 22, 21, 23
+};
 
-    {{1.0f, 0.0f, 1.0f}, {1.0f, 0.5f}}, {{1.0f, 1.0f, 1.0f}, {0.5f, 0.5f}}, // 1, 0, 0 -x
-    {{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, {{1.0f, 1.0f, 0.0f}, {0.5f, 0.0f}},
-
-    {{1.0f, 1.0f, 1.0f}, {1.0f, 0.5f}}, {{2.0f, 1.0f, 1.0f}, {0.5f, 0.5f}}, // 1, 0, 0 +y
-    {{1.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}, {{2.0f, 1.0f, 0.0f}, {0.5f, 0.0f}},
-
-    {{2.0f, 1.0f, 1.0f}, {1.0f, 0.5f}}, {{2.0f, 2.0f, 1.0f}, {0.5f, 0.5f}}, // 2, 1, 0 -x
-    {{2.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}, {{2.0f, 2.0f, 0.0f}, {0.5f, 0.0f}},
-
-    {{2.0f, 2.0f, 1.0f}, {1.0f, 0.5f}}, {{3.0f, 2.0f, 1.0f}, {0.5f, 0.5f}}, // 2, 1, 0 +y
-    {{2.0f, 2.0f, 0.0f}, {1.0f, 0.0f}}, {{3.0f, 2.0f, 0.0f}, {0.5f, 0.0f}},
-
-    {{1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, {{2.0f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 1, 0, 0 +z
-    {{1.0f, 1.0f, 1.0f}, {0.0f, 0.5f}}, {{2.0f, 1.0f, 1.0f}, {0.5f, 0.5f}},
-
-    {{2.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, {{3.0f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 2, 0, 0
-    {{2.0f, 1.0f, 1.0f}, {0.0f, 0.5f}}, {{3.0f, 1.0f, 1.0f}, {0.5f, 0.5f}},
-
-    {{2.0f, 1.0f, 1.0f}, {0.0f, 0.0f}}, {{3.0f, 1.0f, 1.0f}, {0.5f, 0.0f}}, // 2, 1, 0 +z
-    {{2.0f, 2.0f, 1.0f}, {0.0f, 0.5f}}, {{3.0f, 2.0f, 1.0f}, {0.5f, 0.5f}}
-    };
-
-    for(int i = 0; i < 13; i++) {
-        index_vector.push_back(i * 4);
-        index_vector.push_back(i * 4 + 1);
-        index_vector.push_back(i * 4 + 2);
-
-        index_vector.push_back(i * 4 + 1);
-        index_vector.push_back(i * 4 + 2);
-        index_vector.push_back(i * 4 + 3);
+void load_chunk_vertices(std::array<std::array<std::array<int, 16>, 16>, 16>& chunk, std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector) {
+    int count = 0;
+    for(int z = 0; z < 16; z++) {
+        for(int y = 0; y < 16; y++) {
+            for(int x = 0; x < 16; x++) {
+                if(chunk[x][y][z] != 0) {
+                    for(Vertex v : cube_vertices) {
+                        v.position += glm::vec3(x, y, z);
+                        vertex_vector.push_back(v);
+                    }
+                    for(uint32_t i : cube_indices) {
+                        i += count * 24;
+                        index_vector.push_back(i);
+                    }
+                    count++;
+                }
+            }
+        }
     }
 }
 
-std::vector<Vertex> vertex_vector1 = {
-    {{0.0f, 1.0f, 2.0f}, {0.25, 0.375}},
-    {{0.0f, -1.0f, 2.0f}, {0.5, 0.375}},
-    {{0.0f, 1.0f, 0.0f}, {0.25, 0.25}},
-    {{0.0f, -1.0f, 2.0f}, {0.5, 0.375}},
-    {{0.0f, 1.0f, 0.0f}, {0.25, 0.25}},
-    {{0.0f, -1.0f, 0.0f}, {0.5, 0.25}}
-};
-
 int main() {
-    load_vertices();
+    siv::PerlinNoise noise(5009);
+
+    std::array<std::array<std::array<int, 16>, 16>, 16> chunk;
+
+    for(float z = 0; z < 16; z++) {
+        for(float y = 0; y < 16; y++) {
+            for(float x = 0; x < 16; x++) {
+                float val = noise.normalizedOctave3D(x / 32, y / 32, z / 32, 4);
+                chunk[x][y][z] = floor(val);
+            }
+        }
+    }
+
+    load_chunk_vertices(chunk, vertex_vector, index_vector);
 
     int width = 1000, height = 600;
     glfwInit();
@@ -334,9 +385,10 @@ int main() {
 
 
 
-
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
+
+    //glPolygonMode(GL_BACK, GL_LINE);
 
     GLuint program = create_shader_program(v_src, f_src);
 
@@ -354,6 +406,11 @@ int main() {
     time_t start_time = get_time();
 
     bool should_close = false;
+
+    glm::vec2 zero_vector(0.0f, 0.0f);
+
+    Counter frame_switch = {0, 150000000};
+    Counter walk_cycle = {3, 4};
 
     std::cout << index_vector.size() << "\n";
     while(!should_close) {
@@ -409,6 +466,10 @@ int main() {
         if(user_input_array[GLFW_KEY_LEFT_SHIFT]) {
             camera_pos.z -= movement_factor;
         }
+
+        if(frame_switch.increment_by(delta_time)) {
+            walk_cycle.increment();
+        }
         
         glClearColor(0.2, 0.2, 0.2, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -442,14 +503,29 @@ int main() {
         
         glUniformMatrix4fv(0, 1, GL_FALSE, &proj_view_mat[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &identity[0][0]);
+        glUniform2fv(2, 1, &zero_vector[0]);
 
         glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
 
-        glm::vec2 diff = glm::vec2(camera_pos) - glm::vec2(1.0f, 2.5f); 
-        glm::vec3 move(1.0f, 2.5f, 0.0f);
+        glm::vec2 diff = glm::vec2(camera_pos) - glm::vec2(2.5f, 1.5f); 
+        glm::vec3 move(2.5f, 1.5f, 2.0f);
         glm::mat4x4 trans_mat_billboard = identity;
+        float angle = atan2(-diff.y, -diff.x);
+
         trans_mat_billboard = glm::translate(trans_mat_billboard, move);
-        trans_mat_billboard = glm::rotate(trans_mat_billboard, atan2(diff.y, diff.x), up);
+        trans_mat_billboard = glm::rotate(trans_mat_billboard, angle, up);
+
+        glm::vec2 direction_offset_vector(0.25f * walk_cycle.value, 0.0f);
+
+        if(!(angle < M_PI * -0.75 || angle > M_PI * 0.75)) {
+            if(angle < M_PI * -0.25) {
+                direction_offset_vector.y = 0.125f;
+            } else if(angle < M_PI * 0.25) {
+                direction_offset_vector.y = 0.25f;
+            } else {
+                direction_offset_vector.y = 0.375f;
+            }
+        }
 
         glBindVertexArray(vao_id1);
 
@@ -458,6 +534,7 @@ int main() {
         
         glUniformMatrix4fv(0, 1, GL_FALSE, &proj_view_mat[0][0]);
         glUniformMatrix4fv(1, 1, GL_FALSE, &trans_mat_billboard[0][0]);
+        glUniform2fv(2, 1, &direction_offset_vector[0]);
 
         glDrawArrays(GL_TRIANGLES, 0, vertex_vector1.size());
 
