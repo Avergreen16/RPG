@@ -4,6 +4,8 @@
 #include <iostream>
 #include <map>
 #include <chrono>
+#include <unordered_map>
+#include <thread>
 
 #define GLFW_INCLUDE_NONE
 #include <glfw\glfw3.h>
@@ -22,13 +24,13 @@ layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec2 in_tex_coord;
 
 layout(location = 0) uniform mat4 proj_view_mat;
-layout(location = 1) uniform mat4 trans_mat;
+layout(location = 1) uniform mat4 transform_mat;
 layout(location = 2) uniform vec2 tex_offset;
 
 out vec2 tex_coord;
 
 void main() {
-    gl_Position = proj_view_mat * (trans_mat * vec4(in_pos, 1.0));
+    gl_Position = proj_view_mat * (transform_mat * vec4(in_pos, 1.0));
     tex_coord = in_tex_coord + tex_offset;
 }
 )""";
@@ -49,35 +51,11 @@ void main() {
 }
 )""";
 
-struct Counter {
-    unsigned int value;
-    unsigned int limit;
+const int chunk_size = 16;
+const float player_height = 4;
 
-    bool increment() {
-        value++;
-        if(value >= limit) {
-            value = 0;
-            return true;
-        }
-        return false;
-    }
-
-    bool increment_by(unsigned int change) {
-        value += change;
-        if(value >= limit) {
-            value %= limit;
-            return true;
-        }
-        return false;
-    }
-
-    void set_limit(int new_limit) {
-        limit = new_limit;
-        if(value >= limit) value = 0;
-    }
-};
-
-time_t __attribute__((always_inline)) get_time() {
+//__attribute__((always_inline))
+time_t get_time() {
     return std::chrono::steady_clock::now().time_since_epoch().count();
 }
 
@@ -152,88 +130,6 @@ GLuint create_shader_program(const char* vertex_shader, const char* fragment_sha
     return program;
 }
 
-glm::vec3 up(0.0f, 0.0f, 1.0f);
-glm::mat4 identity = glm::identity<glm::mat4>();
-
-float xdeg = 0.0f;
-float zdeg = 0.0f;
-glm::vec3 camera_dir(0.0f, 0.0f, -1.0f);
-glm::vec3 camera_pos(0.0f, 0.0f, 1.0f);
-glm::vec2 move_dir(0.0f, -1.0f);
-
-std::map<int, bool> user_input_array = {
-    {GLFW_KEY_W, false},
-    {GLFW_KEY_A, false},
-    {GLFW_KEY_S, false},
-    {GLFW_KEY_D, false},
-    {GLFW_KEY_LEFT_CONTROL, false},
-    {GLFW_KEY_LEFT_SHIFT, false},
-    {GLFW_MOUSE_BUTTON_LEFT, false}
-};
-
-void update_camera_dir() {
-    float temp_x = cos(glm::radians(xdeg));
-    float temp_y = sin(glm::radians(xdeg));
-    float width_at_z = cos(glm::radians(zdeg));
-    float z = sin(glm::radians(zdeg));
-    camera_dir = glm::vec3(temp_x * width_at_z, temp_y * width_at_z, z);
-
-    move_dir = glm::vec2(temp_x, temp_y);
-}
-
-std::array<double, 2> mouse_pos;
-void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-    if(user_input_array[GLFW_MOUSE_BUTTON_LEFT]) {
-        double mouse_pos_change_x = xpos - mouse_pos[0];
-        double mouse_pos_change_y = ypos - mouse_pos[1];
-
-        xdeg -= mouse_pos_change_x / 2;
-        if(xdeg >= 360) xdeg -= 360;
-        else if(xdeg < 0) xdeg += 360;
-        zdeg = std::max(std::min(89.9, zdeg - mouse_pos_change_y / 2), -89.9);
-
-        update_camera_dir();
-    }
-    mouse_pos = {xpos, ypos};
-}
-
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if(button == GLFW_MOUSE_BUTTON_LEFT) {
-        if(action == GLFW_PRESS) {
-            user_input_array[GLFW_MOUSE_BUTTON_LEFT] = true;
-        } else if(action == GLFW_RELEASE) {
-            user_input_array[GLFW_MOUSE_BUTTON_LEFT] = false;
-        }
-    }
-}
-
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if(action == GLFW_PRESS) {
-        if(user_input_array.contains(key)) {
-            user_input_array[key] = true;
-        }
-    } else if(action == GLFW_RELEASE) {
-       if(user_input_array.find(key) != user_input_array.end()) user_input_array[key] = false;
-    }
-}
-
-float speed = 5.0f;
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    /*if(yoffset > 0) {
-        speed *= 1.5;
-    } else if(yoffset < 0) {
-        speed /= 1.5;
-    }*/
-}
-
-struct Vertex {
-    glm::vec3 position;
-    glm::vec2 color;
-};
-
-std::vector<Vertex> vertex_vector;
-std::vector<uint32_t> index_vector;
-
 unsigned int load_texture(char address[], std::array<int, 3> &info) {
     unsigned int texture_id;
     glGenTextures(1, &texture_id);
@@ -250,13 +146,21 @@ unsigned int load_texture(char address[], std::array<int, 3> &info) {
     return texture_id;
 }
 
+struct Vertex {
+    glm::vec3 position;
+    glm::vec2 color;
+};
+
+std::vector<Vertex> vertex_vector;
+std::vector<uint32_t> index_vector;
+
 std::vector<Vertex> vertex_vector1 = {
-    {{0.0f, 1.0f, 2.0f}, {0.0f, 0.125f}},
-    {{0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.0f, -1.0f, 2.0f}, {0.25f, 0.125f}},
-    {{0.0f, -1.0f, 2.0f}, {0.25f, 0.125f}},
-    {{0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.0f, -1.0f, 0.0f}, {0.25f, 0.0f}}
+    {{0.0f, player_height / 2, player_height}, {0.0f, 0.125f}},
+    {{0.0f, player_height / 2, 0.0f}, {0.0f, 0.0f}},
+    {{0.0f, -player_height / 2, player_height}, {0.25f, 0.125f}},
+    {{0.0f, -player_height / 2, player_height}, {0.25f, 0.125f}},
+    {{0.0f, player_height / 2, 0.0f}, {0.0f, 0.0f}},
+    {{0.0f, -player_height / 2, 0.0f}, {0.25f, 0.0f}}
 };
 
 std::array<Vertex, 24> cube_vertices = {
@@ -300,254 +204,542 @@ std::array<uint32_t, 36> cube_indices = {
     20, 21, 22, 22, 21, 23
 };
 
-void load_chunk_vertices(std::array<std::array<std::array<int, 16>, 16>, 16>& chunk, std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector) {
+struct Counter {
+    unsigned int value;
+    unsigned int limit;
+
+    bool increment() {
+        value++;
+        if(value >= limit) {
+            value = 0;
+            return true;
+        }
+        return false;
+    }
+
+    bool increment_by(unsigned int change) {
+        value += change;
+        if(value >= limit) {
+            value %= limit;
+            return true;
+        }
+        return false;
+    }
+
+    void set_limit(int new_limit) {
+        limit = new_limit;
+        if(value >= limit) value = 0;
+    }
+};
+
+glm::mat4 identity_mat4 = glm::identity<glm::mat4>();
+glm::vec2 zero_vec2(0.0f, 0.0f);
+
+struct Camera {
+    glm::vec3 pos = glm::vec3(0.0f, 0.0f, 1.0f);
+
+    float xdeg = 0.0f;
+    float zdeg = 0.0f;
+    glm::vec3 look_dir;
+    glm::vec3 up = glm::vec3(0.0f, 0.0f, 1.0f);
+
+    glm::vec2 move_dir = glm::vec2(0.0f, -1.0f);
+
+    float near;
+    float far;
+    float view_angle;
+
+    Camera(glm::vec3 pos, glm::vec3 look_at, float near, float far, float view_angle) {
+        glm::vec3 norm_look_at = glm::normalize(look_at);
+        glm::vec2 look_at_xy = glm::vec2(norm_look_at);
+        float length = glm::length(look_at_xy);
+        
+        this->pos = pos;
+        this->look_dir = norm_look_at;
+
+        // getting xdeg and zdeg
+        this->xdeg = atan2(look_at_xy.y, look_at_xy.x);
+        this->zdeg = atan2(norm_look_at.z, length);
+
+        this->move_dir = glm::normalize(look_at_xy);
+
+        this->near = near;
+        this->far = far;
+        this->view_angle = view_angle;
+    }
+    Camera() = default;
+
+    void update_camera_dir() {
+        float temp_x = cos(glm::radians(xdeg));
+        float temp_y = sin(glm::radians(xdeg));
+        float width_at_z = cos(glm::radians(zdeg));
+        float z = sin(glm::radians(zdeg));
+
+        look_dir = glm::vec3(temp_x * width_at_z, temp_y * width_at_z, z);
+        move_dir = glm::vec2(temp_x, temp_y);
+    }
+
+    glm::mat4 get_pv_matrix(int window_width, int window_height) {
+        glm::mat4 matrix = glm::perspective(view_angle, float(window_width) / window_height, near, far); // projection matrix
+        matrix *= glm::lookAt(pos, pos + look_dir, up); // view matrix
+
+        return matrix;
+    }
+};
+
+struct Core {
+    std::map<int, bool> user_input_array = {
+        {GLFW_KEY_W, false},
+        {GLFW_KEY_A, false},
+        {GLFW_KEY_S, false},
+        {GLFW_KEY_D, false},
+        {GLFW_KEY_LEFT_CONTROL, false},
+        {GLFW_KEY_LEFT_SHIFT, false},
+        {GLFW_MOUSE_BUTTON_LEFT, false}
+    };
+
+    float speed = 10.0f;
+    std::array<double, 2> mouse_pos;
+    glm::ivec3 current_chunk_location = glm::ivec3(0x7fffffff, 0x7fffffff, 0x7fffffff);
+    glm::ivec3 render_distance = glm::ivec3(2, 2, 2);
+
+    Camera world_camera;
+    Camera space_camera;
+
+    Core(Camera world_camera) {
+        this->world_camera = world_camera;
+    }
+};
+
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+    Core* core = (Core*)glfwGetWindowUserPointer(window);
+    if(core->user_input_array[GLFW_MOUSE_BUTTON_LEFT]) {
+        double mouse_pos_change_x = xpos - core->mouse_pos[0];
+        double mouse_pos_change_y = ypos - core->mouse_pos[1];
+
+        core->world_camera.xdeg -= mouse_pos_change_x / 2;
+        if(core->world_camera.xdeg >= 360) core->world_camera.xdeg -= 360;
+        else if(core->world_camera.xdeg < 0) core->world_camera.xdeg += 360;
+        core->world_camera.zdeg = std::max(std::min(89.9, core->world_camera.zdeg - mouse_pos_change_y / 2), -89.9);
+    }
+    core->mouse_pos = {xpos, ypos};
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    Core* core = (Core*)glfwGetWindowUserPointer(window);
+    if(button == GLFW_MOUSE_BUTTON_LEFT) {
+        if(action == GLFW_PRESS) {
+            core->user_input_array[GLFW_MOUSE_BUTTON_LEFT] = true;
+        } else if(action == GLFW_RELEASE) {
+            core->user_input_array[GLFW_MOUSE_BUTTON_LEFT] = false;
+        }
+    }
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    Core* core = (Core*)glfwGetWindowUserPointer(window);
+    if(action == GLFW_PRESS) {
+        if(core->user_input_array.contains(key)) {
+            core->user_input_array[key] = true;
+        }
+    } else if(action == GLFW_RELEASE) {
+       if(core->user_input_array.find(key) != core->user_input_array.end()) core->user_input_array[key] = false;
+    }
+}
+
+/*void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    if(yoffset > 0) {
+        speed *= 1.5;
+    } else if(yoffset < 0) {
+        speed /= 1.5;
+    }
+}*/
+
+uint64_t convert_to_chunk_key(glm::ivec3 location) {
+    uint64_t key = 0;
+    
+    key += location.x + 0x8000;
+    key += (location.y + 0x8000) * 0x10000;
+    key += (location.z + 0x8000) * 0x100000000;
+
+    return key;
+}
+
+typedef std::array<std::array<std::array<uint16_t, 16>, 16>, 16> block_id_array;
+
+void load_chunk_vertices(block_id_array& chunk, std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector) {
     int count = 0;
     for(int z = 0; z < 16; z++) {
         for(int y = 0; y < 16; y++) {
             for(int x = 0; x < 16; x++) {
                 if(chunk[x][y][z] != 0) {
-                    for(Vertex v : cube_vertices) {
-                        v.position += glm::vec3(x, y, z);
-                        vertex_vector.push_back(v);
+                    if(x != 0 && chunk[x - 1][y][z] == 0) {
+                        for(int i = 0; i < 4; i++) {
+                            Vertex v = cube_vertices[i];
+                            v.position += glm::vec3(x, y, z);
+                            vertex_vector.push_back(v);
+                        }
+                        for(int i = 0; i < 6; i++) {
+                            index_vector.push_back(cube_indices[i] + count * 4);
+                        }
+                        count++;
                     }
-                    for(uint32_t i : cube_indices) {
-                        i += count * 24;
-                        index_vector.push_back(i);
+                    if(x != 15 && chunk[x + 1][y][z] == 0) {
+                        for(int i = 4; i < 8; i++) {
+                            Vertex v = cube_vertices[i];
+                            v.position += glm::vec3(x, y, z);
+                            vertex_vector.push_back(v);
+                        }
+                        for(int i = 0; i < 6; i++) {
+                            index_vector.push_back(cube_indices[i] + count * 4);
+                        }
+                        count++;
                     }
-                    count++;
+                    if(y != 0 && chunk[x][y - 1][z] == 0) {
+                        for(int i = 8; i < 12; i++) {
+                            Vertex v = cube_vertices[i];
+                            v.position += glm::vec3(x, y, z);
+                            vertex_vector.push_back(v);
+                        }
+                        for(int i = 0; i < 6; i++) {
+                            index_vector.push_back(cube_indices[i] + count * 4);
+                        }
+                        count++;
+                    }
+                    if(y != 15 && chunk[x][y + 1][z] == 0) {
+                        for(int i = 12; i < 16; i++) {
+                            Vertex v = cube_vertices[i];
+                            v.position += glm::vec3(x, y, z);
+                            vertex_vector.push_back(v);
+                        }
+                        for(int i = 0; i < 6; i++) {
+                            index_vector.push_back(cube_indices[i] + count * 4);
+                        }
+                        count++;
+                    }
+                    if(z != 0 && chunk[x][y][z - 1] == 0) {
+                        for(int i = 16; i < 20; i++) {
+                            Vertex v = cube_vertices[i];
+                            v.position += glm::vec3(x, y, z);
+                            vertex_vector.push_back(v);
+                        }
+                        for(int i = 0; i < 6; i++) {
+                            index_vector.push_back(cube_indices[i] + count * 4);
+                        }
+                        count++;
+                    }
+                    if(z != 15 && chunk[x][y][z + 1] == 0) {
+                        for(int i = 20; i < 24; i++) {
+                            Vertex v = cube_vertices[i];
+                            v.position += glm::vec3(x, y, z);
+                            vertex_vector.push_back(v);
+                        }
+                        for(int i = 0; i < 6; i++) {
+                            index_vector.push_back(cube_indices[i] + count * 4);
+                        }
+                        count++;
+                    }
                 }
             }
         }
     }
 }
 
-int main() {
-    siv::PerlinNoise noise(5009);
+struct Chunk_data {
+    GLuint vertex_array;
+    GLuint array_buffer;
+    GLuint element_buffer;
+    glm::mat4 transform_mat = identity_mat4;
+    int index_count;
 
-    std::array<std::array<std::array<int, 16>, 16>, 16> chunk;
+    bool vertices_loaded = false;
 
+    std::vector<Vertex> vertex_vector;
+    std::vector<uint32_t> index_vector;
+
+    block_id_array blocks;
+
+    Chunk_data(std::vector<Vertex>& vertex_vector, std::vector<uint32_t>& index_vector, glm::vec3 corner_coordinates) {
+        this->vertex_vector = vertex_vector;
+        this->index_vector = index_vector;
+
+        index_count = index_vector.size();
+        transform_mat = glm::translate(transform_mat, corner_coordinates);
+    }
+
+    void load_vertices() {
+        // create and bind buffers
+        glCreateVertexArrays(1, &vertex_array);
+        glBindVertexArray(vertex_array);
+
+        glCreateBuffers(1, &array_buffer);
+        glBindBuffer(GL_ARRAY_BUFFER, array_buffer);
+
+        glCreateBuffers(1, &element_buffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
+
+        // load buffers with data
+        glBufferData(GL_ARRAY_BUFFER, vertex_vector.size() * sizeof(Vertex), vertex_vector.data(), GL_STATIC_DRAW); // array buffer (vertices)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
+        glEnableVertexAttribArray(1);
+
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_vector.size() * sizeof(uint32_t), index_vector.data(), GL_STATIC_DRAW); // element buffer (indices)
+
+        vertices_loaded = true;
+    }
+
+    void render(GLuint shader_program, GLuint texture, glm::mat4& pv_mat) {
+        glBindVertexArray(vertex_array);
+
+        glUseProgram(shader_program);
+        glBindTexture(GL_TEXTURE_2D, texture);        
+        glUniformMatrix4fv(0, 1, GL_FALSE, &pv_mat[0][0]);
+        glUniformMatrix4fv(1, 1, GL_FALSE, &transform_mat[0][0]);
+        glUniform2fv(2, 1, &zero_vec2[0]);
+        glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT, 0);
+    }
+
+    void delete_buffers() {
+        glDeleteBuffers(1, &array_buffer);
+        glDeleteBuffers(1, &element_buffer);
+        glDeleteVertexArrays(1, &vertex_array);
+    }
+};
+
+std::vector<uint64_t> loaded_chunk_keys;
+std::unordered_map<uint64_t, Chunk_data> chunk_map;
+
+void generate_chunk(glm::ivec3 location, siv::PerlinNoise& noise) {
+    time_t start_time = get_time();
+    block_id_array chunk;
+    glm::vec3 corner = location * 16;
     for(float z = 0; z < 16; z++) {
         for(float y = 0; y < 16; y++) {
             for(float x = 0; x < 16; x++) {
-                float val = noise.normalizedOctave3D(x / 32, y / 32, z / 32, 4);
+                float val = noise.normalizedOctave3D((corner.x + x) / 16, (corner.y + y) / 16, (corner.z + z) / 16, 4);
                 chunk[x][y][z] = floor(val);
             }
         }
     }
 
+    std::vector<Vertex> vertex_vector;
+    std::vector<uint32_t> index_vector;
     load_chunk_vertices(chunk, vertex_vector, index_vector);
 
-    int width = 1000, height = 600;
+    chunk_map.emplace(convert_to_chunk_key(location), Chunk_data(vertex_vector, index_vector, corner));
+    std::cout << vertex_vector.size() << "\n";
+    std::cout << double(get_time() - start_time) / 1000000000 << "\n";
+}
+
+void load_chunk_loop(bool& game_running, Core& core, siv::PerlinNoise& noise, std::vector<uint64_t>& loaded_chunk_keys) {
+    while(game_running) {
+        glm::ivec3 camera_chunk_location = glm::floor(core.world_camera.pos / 16.0f);
+        if(camera_chunk_location != core.current_chunk_location) {
+            core.current_chunk_location = camera_chunk_location;
+            std::vector<uint64_t> chunk_keys;
+            for(int z = -core.render_distance.z; z <= core.render_distance.z; z++) {
+                for(int y = -core.render_distance.y; y <= core.render_distance.y; y++) {
+                    for(int x = -core.render_distance.x; x <= core.render_distance.x; x++) {
+                        glm::ivec3 chunk_loc(x + core.current_chunk_location.x, y + core.current_chunk_location.y, z + core.current_chunk_location.z);
+                        uint64_t key = convert_to_chunk_key(chunk_loc);
+
+                        if(!chunk_map.contains(key)) {
+                            generate_chunk(chunk_loc, noise);
+                        }
+
+                        chunk_keys.push_back(key);
+                    }
+                }
+            }
+            loaded_chunk_keys = chunk_keys;
+        }
+    }
+}
+
+int main() {
+    // load world vertices
+    siv::PerlinNoise noise(5009);
+
     glfwInit();
 
+    // set up window attributes and callbacks
+    int width = 1000, height = 600;
     GLFWwindow* window = glfwCreateWindow(width, height, "test", NULL, NULL);
     glfwMakeContextCurrent(window);
-    gladLoadGL();
-
-    glfwSwapInterval(0);
-    
-    GLuint vao_id;
-    glCreateVertexArrays(1, &vao_id);
-    glBindVertexArray(vao_id);
-
-    GLuint array_buffer_id;
-    glCreateBuffers(1, &array_buffer_id);
-    glBindBuffer(GL_ARRAY_BUFFER, array_buffer_id);
-    glBufferData(GL_ARRAY_BUFFER, vertex_vector.size() * sizeof(Vertex), vertex_vector.data(), GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
-    glEnableVertexAttribArray(1);
-    /*glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 5));
-    glEnableVertexAttribArray(2);*/
-
-    GLuint ebo_id;
-    glCreateBuffers(1, &ebo_id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_vector.size() * sizeof(uint32_t), index_vector.data(), GL_STATIC_DRAW);
-
-
-
-    GLuint vao_id1;
-    glCreateVertexArrays(1, &vao_id1);
-    glBindVertexArray(vao_id1);
-
-    GLuint array_buffer_id1;
-    glCreateBuffers(1, &array_buffer_id1);
-    glBindBuffer(GL_ARRAY_BUFFER, array_buffer_id1);
-    glBufferData(GL_ARRAY_BUFFER, vertex_vector1.size() * sizeof(Vertex), vertex_vector1.data(), GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
-    glEnableVertexAttribArray(1);
-
-
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-
-    //glPolygonMode(GL_BACK, GL_LINE);
-
-    GLuint program = create_shader_program(v_src, f_src);
-
-    stbi_set_flip_vertically_on_load(1);
-    std::array<int, 3> info;
-    GLuint texture = load_texture("res\\tiles\\3d_tileset.png", info);
-    GLuint player_texture = load_texture("res\\entities\\Player\\avergreen_spritesheet.png", info);
-
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetKeyCallback(window, key_callback);
+    Core core(Camera({0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, 0.0625f, 1024.0f, 45.0f));
+    glfwSetWindowUserPointer(window, (void*)&core);
+    glfwSwapInterval(0);
 
+    gladLoadGL();
+
+    // create and bind buffers for character
+    GLuint vertex_array1;
+    glCreateVertexArrays(1, &vertex_array1);
+    glBindVertexArray(vertex_array1);
+    GLuint array_buffer1;
+    glCreateBuffers(1, &array_buffer1);
+    glBindBuffer(GL_ARRAY_BUFFER, array_buffer1);
+    // load vertices
+    glBufferData(GL_ARRAY_BUFFER, vertex_vector1.size() * sizeof(Vertex), vertex_vector1.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 3));
+    glEnableVertexAttribArray(1);
+
+    // settings (depth testing, see triangles)
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_CULL_FACE);
     //glPolygonMode(GL_BACK, GL_LINE);
 
-    time_t start_time = get_time();
+    // shaders
+    GLuint program = create_shader_program(v_src, f_src);
 
-    bool should_close = false;
+    // load textures
+    stbi_set_flip_vertically_on_load(1);
+    std::array<int, 3> info;
+    GLuint texture = load_texture("res\\tiles\\3d_tileset_16.png", info);
+    GLuint player_texture = load_texture("res\\entities\\Player\\avergreen_spritesheet.png", info);
 
-    glm::vec2 zero_vector(0.0f, 0.0f);
+    // generate chunks
+    /*for(int i = 0; i < 27; i++) {
+        generate_chunk(glm::ivec3{i % 3 - 1, (i / 3) % 3 - 1, i / 9 - 1}, noise);
+    }*/
+    /*generate_chunk(glm::ivec3{1, 0, 0}, noise);
+    generate_chunk(glm::ivec3{1, 1, 0}, noise);
+    generate_chunk(glm::ivec3{0, 1, 0}, noise);*/
 
+    // counters for walk cycle
     Counter frame_switch = {0, 150000000};
     Counter walk_cycle = {3, 4};
 
-    std::cout << index_vector.size() << "\n";
-    while(!should_close) {
+    bool game_running = true;
+
+    std::thread chunk_load_thread(
+        [&game_running, &core, &noise]() {
+            load_chunk_loop(game_running, core, noise, loaded_chunk_keys);
+        }
+    );
+
+    //chunk_load_thread.join();
+
+    time_t start_time = get_time();
+    while(game_running) {
+        // time calculations (get delta_time)
         time_t current_time = get_time();
         uint32_t delta_time = current_time - start_time;
         start_time = current_time;
 
+        // update window size
         glfwGetFramebufferSize(window, &width, &height);
-        if(width == 0 || height == 0) {
+        if(width == 0 && height == 0) {
             width = 16;
             height = 16;
         }
         glViewport(0, 0, width, height);
 
+        // get key inputs
         glfwPollEvents();
+        core.world_camera.update_camera_dir();
 
-        glm::vec2 move_vector(0.0f, 0.0f);
-    
-        if(user_input_array[GLFW_KEY_W]) {
-            move_vector.x += move_dir.x;
-            move_vector.y += move_dir.y;
+        // move the camera
+        glm::vec3 move_vector(0.0f, 0.0f, 0.0f);
+        if(core.user_input_array[GLFW_KEY_W]) {
+            move_vector.x += core.world_camera.move_dir.x;
+            move_vector.y += core.world_camera.move_dir.y;
         } 
-        if(user_input_array[GLFW_KEY_A]) {
-            move_vector.x -= move_dir.y;
-            move_vector.y += move_dir.x;
+        if(core.user_input_array[GLFW_KEY_A]) {
+            move_vector.x -= core.world_camera.move_dir.y;
+            move_vector.y += core.world_camera.move_dir.x;
         } 
-        if(user_input_array[GLFW_KEY_S]) {
-            move_vector.x -= move_dir.x;
-            move_vector.y -= move_dir.y;
+        if(core.user_input_array[GLFW_KEY_S]) {
+            move_vector.x -= core.world_camera.move_dir.x;
+            move_vector.y -= core.world_camera.move_dir.y;
         }
-        if(user_input_array[GLFW_KEY_D]) {
-            move_vector.x += move_dir.y;
-            move_vector.y -= move_dir.x;
+        if(core.user_input_array[GLFW_KEY_D]) {
+            move_vector.x += core.world_camera.move_dir.y;
+            move_vector.y -= core.world_camera.move_dir.x;
         }
-
+        // normalize x and y and scale move vector based on delta_time and key inputs
         if(!(move_vector.x == 0.0f && move_vector.y == 0.0f)) {
             move_vector = glm::normalize(move_vector);
-            std::cout << camera_pos.x << " " << camera_pos.y << " " << camera_pos.z << "\n";
         } 
-        float movement_factor = speed * (double(delta_time) / 1000000000);
-
-        if(user_input_array[GLFW_KEY_LEFT_CONTROL]) {
-            move_vector *= movement_factor * 2.0f;
-        } else {
-            move_vector *= movement_factor;
+        if(core.user_input_array[GLFW_KEY_SPACE]) {
+            move_vector.z += 1.0f;
         }
-
-        camera_pos += glm::vec3(move_vector, 0.0f);
-
-        if(user_input_array[GLFW_KEY_SPACE]) {
-            camera_pos.z += movement_factor;
+        if(core.user_input_array[GLFW_KEY_LEFT_SHIFT]) {
+            move_vector.z -= 1.0f;
         }
-        if(user_input_array[GLFW_KEY_LEFT_SHIFT]) {
-            camera_pos.z -= movement_factor;
-        }
+        float move_factor = core.speed * (double(delta_time) / 1000000000) * ((core.user_input_array[GLFW_KEY_LEFT_CONTROL]) ? 2.0f : 1.0f);
+        core.world_camera.pos += move_vector * move_factor;
 
+        // character walk cycle
         if(frame_switch.increment_by(delta_time)) {
             walk_cycle.increment();
         }
         
+        // clear window and reset screen buffers
         glClearColor(0.2, 0.2, 0.2, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
-        glBindVertexArray(vao_id);
 
-        glm::vec3 center = camera_pos + camera_dir;
-        glm::mat4 view_matrix = glm::lookAt(camera_pos, center, up);
+        // get projection and view matrix
+        glm::mat4 pv_mat = core.world_camera.get_pv_matrix(width, height);
 
-        /*float projection_width = width;
-        float projection_height = height;
-        float aspect_ratio = projection_height / projection_width;
-        float w = 100;
-        float h = w * aspect_ratio;
-
-        float left = -w / 2.0f;
-        float right = w / 2.0f;
-        float bottom = -h / 2.0f;
-        float top = h / 2.0f;*/
-        float near = 0.1f;
-        float far = 100.0f;
-
-        glm::mat4 projection_matrix = glm::perspective(45.0f, float(width) / height, near, far);//glm::ortho(left, right, bottom, top, near, far);
-
-        glm::mat4 proj_view_mat = projection_matrix * view_matrix;
-
-        glBindVertexArray(vao_id);
-
-        glUseProgram(program);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        
-        glUniformMatrix4fv(0, 1, GL_FALSE, &proj_view_mat[0][0]);
-        glUniformMatrix4fv(1, 1, GL_FALSE, &identity[0][0]);
-        glUniform2fv(2, 1, &zero_vector[0]);
-
-        glDrawElements(GL_TRIANGLES, index_vector.size(), GL_UNSIGNED_INT, 0);
-
-        glm::vec2 diff = glm::vec2(camera_pos) - glm::vec2(2.5f, 1.5f); 
-        glm::vec3 move(2.5f, 1.5f, 2.0f);
-        glm::mat4x4 trans_mat_billboard = identity;
-        float angle = atan2(-diff.y, -diff.x);
-
-        trans_mat_billboard = glm::translate(trans_mat_billboard, move);
-        trans_mat_billboard = glm::rotate(trans_mat_billboard, angle, up);
-
-        glm::vec2 direction_offset_vector(0.25f * walk_cycle.value, 0.0f);
-
-        if(!(angle < M_PI * -0.75 || angle > M_PI * 0.75)) {
-            if(angle < M_PI * -0.25) {
-                direction_offset_vector.y = 0.125f;
-            } else if(angle < M_PI * 0.25) {
-                direction_offset_vector.y = 0.25f;
-            } else {
-                direction_offset_vector.y = 0.375f;
+        // bind world vertices and draw world
+        for(uint64_t key : loaded_chunk_keys) {
+            Chunk_data& c = chunk_map.at(key);
+            if(!c.vertices_loaded) {
+                c.load_vertices();
             }
+            c.render(program, texture, pv_mat);
         }
 
-        glBindVertexArray(vao_id1);
+        // translate character for billboard effect
+        glm::vec2 diff = glm::vec2(core.world_camera.pos) - glm::vec2(7.0f, 3.0f); 
+        glm::vec3 move(7.0f, 3.0f, 3.0f);
+        float angle = atan2(-diff.y, -diff.x);
+        glm::mat4 transform_mat_billboard = identity_mat4;
+        transform_mat_billboard = glm::translate(transform_mat_billboard, move);
+        transform_mat_billboard = glm::rotate(transform_mat_billboard, angle, core.world_camera.up);
+        // change sprite shown based on rotation angle
+        glm::vec2 direction_offset_vector(0.25f * walk_cycle.value, 0.25f);
+        float look_angle = fmod(angle - M_PI / 2 + M_PI * 2, M_PI * 2);
+        if(!(look_angle < M_PI * 0.25 || look_angle > M_PI * 1.75)) {
+            if(look_angle < M_PI * 0.75) {
+                direction_offset_vector.y = 0.375f;
+            } else if(look_angle < M_PI * 1.25) {
+                direction_offset_vector.y = 0.0f;
+            } else {
+                direction_offset_vector.y = 0.125f;
+            }
+        }
+        
+        // bind vertices and draw character
+        glBindVertexArray(vertex_array1);
 
         glUseProgram(program);
         glBindTexture(GL_TEXTURE_2D, player_texture);
-        
-        glUniformMatrix4fv(0, 1, GL_FALSE, &proj_view_mat[0][0]);
-        glUniformMatrix4fv(1, 1, GL_FALSE, &trans_mat_billboard[0][0]);
+        glUniformMatrix4fv(0, 1, GL_FALSE, &pv_mat[0][0]);
+        glUniformMatrix4fv(1, 1, GL_FALSE, &transform_mat_billboard[0][0]);
         glUniform2fv(2, 1, &direction_offset_vector[0]);
-
         glDrawArrays(GL_TRIANGLES, 0, vertex_vector1.size());
-
-
 
         glfwSwapBuffers(window);
 
-        should_close = glfwWindowShouldClose(window);
+        game_running = !glfwWindowShouldClose(window);
     }
 
-    glDeleteBuffers(1, &array_buffer_id);
-    glDeleteBuffers(1, &ebo_id);
-    glDeleteVertexArrays(1, &vao_id);
+    // delete buffers
+    for(auto& [key, c] : chunk_map) {
+        c.delete_buffers();
+    }
+    glDeleteBuffers(1, &array_buffer1);
+    glDeleteVertexArrays(1, &vertex_array1);
 
     glfwDestroyWindow(window);
     glfwTerminate();
