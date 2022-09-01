@@ -403,7 +403,7 @@ struct Chunk_data {
         for(float z = 0; z < 16; z++) {
             for(float y = 0; y < 16; y++) {
                 for(float x = 0; x < 16; x++) {
-                    float val = noise.normalizedOctave3D((corner.x + x) / 16, (corner.y + y) / 16, (corner.z + z) / 16, 4);
+                    float val = ((noise.normalizedOctave2D((corner.x + x) / 256, (corner.y + y) / 256, 4) * 80 < corner.z + z) ? 0 : 1);
                     blocks[x][y][z] = floor(val);
                 }
             }
@@ -429,30 +429,8 @@ struct Chunk_data {
                             }
                             count++;
                         }
-                        if((x == 15 && chunk_map.at(key + 1).blocks[0][y][z] == 0) || (x != 15 && blocks[x + 1][y][z] == 0)) {
-                            for(int i = 4; i < 8; i++) {
-                                Vertex v = cube_vertices[i];
-                                v.position += glm::vec3(x, y, z);
-                                vertex_vector.push_back(v);
-                            }
-                            for(int i = 0; i < 6; i++) {
-                                index_vector.push_back(cube_indices[i] + count * 4);
-                            }
-                            count++;
-                        }
                         if((y == 0 && chunk_map.at(key - 0x1000).blocks[x][15][z] == 0) || (y != 0 && blocks[x][y - 1][z] == 0)) {
                             for(int i = 8; i < 12; i++) {
-                                Vertex v = cube_vertices[i];
-                                v.position += glm::vec3(x, y, z);
-                                vertex_vector.push_back(v);
-                            }
-                            for(int i = 0; i < 6; i++) {
-                                index_vector.push_back(cube_indices[i] + count * 4);
-                            }
-                            count++;
-                        }
-                        if((y == 15 && chunk_map.at(key + 0x1000).blocks[x][0][z] == 0) || (y != 15 && blocks[x][y + 1][z] == 0)) {
-                            for(int i = 12; i < 16; i++) {
                                 Vertex v = cube_vertices[i];
                                 v.position += glm::vec3(x, y, z);
                                 vertex_vector.push_back(v);
@@ -473,10 +451,66 @@ struct Chunk_data {
                             }
                             count++;
                         }
-                        if((z == 15 && chunk_map.at(key + 0x1000000).blocks[x][y][0] == 0) || (z != 15 && blocks[x][y][z + 1] == 0)) {
+                        if((x == 15 && chunk_map.at(key + 1).blocks[0][y][z] == 0)) {
+                            for(int i = 4; i < 8; i++) {
+                                Vertex v = cube_vertices[i];
+                                v.position += glm::vec3(x, y, z);
+                                vertex_vector.push_back(v);
+                            }
+                            for(int i = 0; i < 6; i++) {
+                                index_vector.push_back(cube_indices[i] + count * 4);
+                            }
+                            count++;
+                        }
+                        if((y == 15 && chunk_map.at(key + 0x1000).blocks[x][0][z] == 0)) {
+                            for(int i = 12; i < 16; i++) {
+                                Vertex v = cube_vertices[i];
+                                v.position += glm::vec3(x, y, z);
+                                vertex_vector.push_back(v);
+                            }
+                            for(int i = 0; i < 6; i++) {
+                                index_vector.push_back(cube_indices[i] + count * 4);
+                            }
+                            count++;
+                        }
+                        if((z == 15 && chunk_map.at(key + 0x1000000).blocks[x][y][0] == 0)) {
                             for(int i = 20; i < 24; i++) {
                                 Vertex v = cube_vertices[i];
                                 v.position += glm::vec3(x, y, z);
+                                vertex_vector.push_back(v);
+                            }
+                            for(int i = 0; i < 6; i++) {
+                                index_vector.push_back(cube_indices[i] + count * 4);
+                            }
+                            count++;
+                        }
+                    } else {
+                        if((x != 0 && blocks[x - 1][y][z] == 1)) {
+                            for(int i = 4; i < 8; i++) {
+                                Vertex v = cube_vertices[i];
+                                v.position += glm::vec3(x - 1, y, z);
+                                vertex_vector.push_back(v);
+                            }
+                            for(int i = 0; i < 6; i++) {
+                                index_vector.push_back(cube_indices[i] + count * 4);
+                            }
+                            count++;
+                        }
+                        if((y != 0 && blocks[x][y - 1][z] == 1)) {
+                            for(int i = 12; i < 16; i++) {
+                                Vertex v = cube_vertices[i];
+                                v.position += glm::vec3(x, y - 1, z);
+                                vertex_vector.push_back(v);
+                            }
+                            for(int i = 0; i < 6; i++) {
+                                index_vector.push_back(cube_indices[i] + count * 4);
+                            }
+                            count++;
+                        }
+                        if((z != 0 && blocks[x][y][z - 1] == 1)) {
+                            for(int i = 20; i < 24; i++) {
+                                Vertex v = cube_vertices[i];
+                                v.position += glm::vec3(x, y, z - 1);
                                 vertex_vector.push_back(v);
                             }
                             for(int i = 0; i < 6; i++) {
@@ -538,8 +572,6 @@ struct Chunk_data {
     }
 
     static void generate_chunk(glm::ivec3 location, siv::PerlinNoise& noise) {
-        time_t start_time = get_time();
-
         uint64_t key = convert_to_chunk_key(location);
 
         if(!chunk_map.contains(key)) {
@@ -573,8 +605,6 @@ struct Chunk_data {
         }
 
         chunk_map.at(key).generate_mesh();
-
-        std::cout << double(get_time() - start_time) / 1000000000 << "\n";
     }
 };
 
@@ -592,7 +622,9 @@ void load_chunk_loop(bool& game_running, Core& core, siv::PerlinNoise& noise, st
                         glm::ivec3 chunk_loc(x + core.current_chunk_location.x, y + core.current_chunk_location.y, z + core.current_chunk_location.z);
                         uint64_t key = convert_to_chunk_key(chunk_loc);
 
-                        if(!chunk_map.contains(key) || !chunk_map.at(key).mesh_generated) {
+                        if(!chunk_map.contains(key)) {
+                            Chunk_data::generate_chunk(chunk_loc, noise);
+                        } else if(!chunk_map.at(key).mesh_generated) {
                             Chunk_data::generate_chunk(chunk_loc, noise);
                         }
 
@@ -732,6 +764,7 @@ int main() {
         // bind world vertices and draw world
         std::vector<uint64_t> temp_keys = loaded_chunk_keys;
         for(uint64_t key : temp_keys) {
+            if(!chunk_map.contains(key)) std::cout << "error: " << key << "\n";
             Chunk_data& c = chunk_map.at(key);
             if(!c.vertices_loaded) {
                 c.load_vertices();

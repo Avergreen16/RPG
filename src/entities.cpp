@@ -8,7 +8,7 @@
 #include "global.cpp"
 #include "text.cpp"
 #include "asio_packets.cpp"
-#include "worldgen.cpp"
+#include "client_world.cpp"
 #include "render.cpp"
 
 time_t __attribute__((always_inline)) get_time() {
@@ -108,8 +108,8 @@ struct Entity {
         last_input_time = get_time();
     }
 
-    void render(int reference_y, std::array<double, 2> camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
-        draw_tile(shader, spritesheet, {float((position[0] - camera_pos[0] + visual_offset[0]) * scale), float((position[1] - camera_pos[1] + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 8}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
+    void render(int reference_y, glm::vec2 camera_pos, float scale, uint shader, std::array<int, 2> window_size) {
+        draw_tile(shader, spritesheet, {float((position[0] - camera_pos.x + visual_offset[0]) * scale), float((position[1] - camera_pos.y + visual_offset[1]) * scale), visual_size[0] * scale, visual_size[1] * scale}, {active_sprite[0], active_sprite[1], 1, 1, 4, 8}, window_size, (position[1] - 0.125 - reference_y) * 0.01 + 0.1);
     }
 
     int insert_position(netwk::entity_movement_packet_toclient input_packet) {

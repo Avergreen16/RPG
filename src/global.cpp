@@ -1,6 +1,8 @@
 #pragma once
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <glm-master\glm\glm.hpp>
+#include <glm-master\glm\gtc\matrix_transform.hpp>
 
 typedef uint32_t uint;
 
