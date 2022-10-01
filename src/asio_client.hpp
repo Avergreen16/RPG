@@ -9,11 +9,11 @@
 
 #include "entities.cpp"
 #include "asio_packets.cpp"
-#include "worldgen.cpp"
+#include "client_world.cpp"
 
 using asio::ip::tcp;
 
-struct Setting;
+struct Core;
 
 namespace netwk {
     struct TCP_client {
@@ -24,9 +24,9 @@ namespace netwk {
 
         TCP_client(uint16_t target_port);
 
-        void receive_loop(Setting& setting, bool& game_running);
+        void receive_loop(Core& core, bool& game_running);
 
-        void start(Setting& setting, bool& game_running);
+        void start(Core& core, bool& game_running);
 
         void send(std::vector<uint8_t> packet);
     };
